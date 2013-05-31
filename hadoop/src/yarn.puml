@@ -15,81 +15,109 @@ participant "Data\nNode\n(dn)" as DN
 
 == Bootstrap ==
 
-NM->RM: [?] nodeStatus()
-DN->NN: heartbeat( status ): <b>block-token-secret</b>
+NM->RM: nodeStatus\n [?]\n ()\n :  
+
+DN->NN: heartbeat\n [?]\n ( status )\n: <b>blk-tkn-secret</b> 
+
 
 == Job Definition ==
 
   note over C,RM: Client uses HDFS to define job.\nDo they use AM to do anything first?
-C->NN: [RPC:SASL(c/nn)] mkdir( job-dir )
-C->NN: [RPC:SASL(c/nn)] writeFile(): block-id, block-location, <b>block-access-token</b>
-C->DN: [DTP(<b>block-access-token</b>)] readBlock( block-id ): block-data
+
+C->NN: mkdir\n [RPC:SASL(c,nn)]\n ( job-dir )  
+
+C->NN: writeFile\n [RPC:SASL(c,nn)]\n ()\n : blk-id, blk-loc, <b>blk-access-tkn</b>  
+
+C->DN: readblk\n [DTP(<b>blk-access-tkn</b>)]\n ( blk-id ): blk-data  
+
 
 == Job Submission ==
 
-C->RM: [?] submitJob( job-dir? )
+C->RM: submitJob\n [?]\n ( job-dir? )\n :  
   note right: Is the job-id acquired before it is defined?
 
 == Job Initiation ==
 
-RM->RM: [?] allocateResource()
-RM->NM: [?] launchContainer( launch-spec=mr2, <b>tokens?</b> )
+RM->RM: allocateResource\n [?]\n ()\n : 
+
+RM->NM: launchContainer\n [?]\n ( spec=mr2, <b>tokens?</b> ) 
   create AM
-NM->AM: [CLI as ?] exec()
+
+NM->AM: exec\n [as ?]\n ()  
   note over AM: How do ApplicationTokens, ContainerTokens\nand DelegationTokens come into play?
   activate AM
-AM->RM: [?] register()
+
+AM->RM: register\n [?]\n ()  
 
 == Map Task Execution ==
 
-AM->RM: [?] negotateResources(): ContainerInfo
-AM->NM: [?] launchContainer( launch-spec=map-task, <b>tokens?</b> )
+AM->RM: negotateResources\n [?]\n ()\n : ContainerInfo?  
+
+AM->NM: launchContainer\n [?]\n ( spec=map, <b>tokens?</b> )  
   create AC
-NM->AC: [CLI as ?] exec()
+
+NM->AC: exec\n [as ?]\n () 
   note right #red: setuid?
-  note over AC: Does AC exec a setuid program?
+  note over AC: Is AC exec a setuid program?
   activate AC
+
+AC->FS: extractFiles?
+  note right: Does AC extract the job files from HDFS?
   create T
-AC->T: [CLI as c] exec()
+
+AC->T: exec\n [as c]\n ()  
   note right #green: Map Task
   activate T
-  T->NN: [?] readFile
-  T->DN: [?] readBlock
+  T->NN: readFile\n [RPC:SASL(<b>c-deleg-tkn</b>,nn)]\n ( split-file )\n : blk-id, blk-loc, <b>blk-access-tkn</b> 
+  T->DN: readblk\n [DTP(<b>blk-access-tkn</b>)]\n ( blk-id )\n: split-blk-data 
   deactivate T
   destroy T
-AC->AM: [?] jobStatus()
+
+AC->AM: jobStatus\n [?]\n ()
   note right: How does AC access AM?\nWhat does AC do now?
   deactivate AC
   destroy AC
 
+
 == Status Query ==
 
-C->AM: [?] statusQuery()
+C->AM: statusQuery [?] ()
   note right: How does C know how to access AM?
 
 == Reduce Task Execution ==
 
-AM->RM: [?] negotateResources(): ContainerInfo
-AM->NM: [?] launchContainer( launch-spec=map-task, <b>tokens</b> )
+AM->RM: negotateResources\n [?]\n ()\n : ContainerInfo
+
+AM->NM: launchContainer\n [?]\n ( spec=reduce, <b>tokens</b> )
   create AC
-NM->AC: [CLI as ?] exec()
+
+NM->AC: exec\n [as ?]\n ()
   note right: Are different containers used\nfor Map and Reduce Tasks?
   activate AC
+
+AC->FS: extractFiles?
+  note right: Does AC extract the job files from HDFS?
   create T
-AC->T: [CLI as c] exec()
+
+AC->T: exec\n [as c]\n ()
   note right #green: Reduce Task
   activate T
-  T->NN: [?] writeFile
-  T->DN: [?] writeBlock
+
+T->NN: writeFile\n [RPC:SASL(<b>c-deleg-tkn</b>,nn)]\n ( reduce-file )\n : blk-id, blk-loc, <b>blk-access-tkn</b>
+  note right: Need to identify where c-deleg-tkn\ncame from and when it was refreshed.
+
+T->DN: writeblk\n [DTP(<b>blk-access-tkn</b>)]\n ( blk-id )\n : reduce-blk-data
   deactivate T
   destroy T
-AC->AM: [?] jobStatus()
+
+AC->AM: jobStatus\n [?]\n ()
   deactivate AC
   destroy AC
 
+
 == Job Completion ==
 
-deactivate AM
-destroy AM
+  deactivate AM
+  destroy AM
 
 @enduml
