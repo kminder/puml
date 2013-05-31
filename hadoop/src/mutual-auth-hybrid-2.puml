@@ -1,0 +1,147 @@
+@startuml
+autonumber
+title HSSO Mutual Authentication
+
+participant Installer as I
+participant Client as C
+participant IDP as IDP
+participant NameNode as NN
+participant DataNode as DN
+participant HSSO as SR
+
+'c = Client
+'sr = Service Registry
+'nn = Name Node
+'svc = Service
+'cert = Certificate
+'pub-key = Public Key
+'pri-key = Private Key
+'ms = Master Secret
+'rc = Registration Code
+'ak = Authentication Key (opaque unique key known only by SR and svc/c. Like Kerberos service password)
+'at = Access Token (See structure below)
+'sk = Session Key (opaque unique key shared between client and service. Like Kerberos SessionKey)
+'id = Identity (as in the identity asserted via SSL handshake)
+'[Protocol:ServerAuth(data)/ClientAuth(identity)]
+'reg-code = Registration code.  Short lived one time code.
+
+'Access Token Structure
+'x-y-at = encrypted with x-sr-ak {
+'           encrypted with y-sr-ak { x-id, y-id, x-attrs, x-privs, expiry, x-y-sk }
+'           [x-id,] y-id, expiry, x-y-sk }
+' For SASL Mutual Authentication:
+'   Consumer decrypts access-token with x-sr-ak and sends (AH/SASL) inner encrypted part to Service as client auth.
+'   Service decrypts with y-sr-ak and encrypts x-id with x-y-sk and returns result to Consumer.
+'   Consumer decrypts result with x-y-sk and verifies result matches x-id as server auth.
+' Note: This mechanism only used with SASL mutual auth required and SSL not available.
+
+'TODO:ISSUE: What can someone do with a stolen *-*-ak or *-*-sk?
+
+== Install ==
+
+I->SR: [ON(sr-h)/AS(sr-u)/CLI] persistMasterSecret(sr-master-secret)
+I->SR: [ON(sr-h)/AS(sr-u)/CLI] persistIdentityCertificate(sr-cert)
+
+
+== Service Bootstrap ==
+
+activate I
+I->SR: [ON(sr-h)/AS(sr-u)/CLI] preregisterService(svc-type=nn) :sr-reg-url,sr-id-pub-key,nn-rc
+I->NN: [ON(nn-h)/AS(nn-u)/CLI] firstServiceStart(nn-ms,sr-reg-url,sr-id-pub-key,nn-rc)
+  activate NN
+  NN->SR: [HTTP:SSL(sr-id)] registerService(nn-rc,nn-svc-url) :nn-cert,nn-sr-at,nn-sr-ak
+  deactivate NN
+
+I->SR: [ON(sr-h)/AS(sr-u)/CLI] preregisterService(svc-type=dn) :sr-reg-url,sr-id-pub-key,dn-rc
+I->DN: [ON(dn-h)/AS(dn-u)/CLI] firstServiceStart(dn-ms,sr-reg-url-sr-id-pub-key,dn-rc)
+  activate DN
+  DN->SR: [HTTP:SSL(sr-id)] registerService(dn-rc,dn-svc-url) :dn-cert,dn-sr-at,dn-sr-ak
+  deactivate DN
+deactivate I
+
+
+== Service Interaction ==
+
+'note right DataNode must verify that sr-id from SSL matches sr-id in dn-sr-at 
+DN->SR: [HTTP:SSL(sr-id)/AH(dn-sr-at)] acquireAccessToken(svc-type=nn) :dn-nn-at,nn-svc-url
+
+'note right DataNode must verify that nn-id from SSL matches nn-id in dn-nn-at.
+'note right SASL can also provide mutual auth given access-token.
+DN->NN: [RPC:SSL(nn-id)/SASL(dn-nn-at)] heartbeat(status) :block-access-token-secret
+
+
+== Service Access Token Refresh (daily?) ==
+
+NN->SR: [HTTP:SSL(sr-id)/AH(nn-sr-at)] refreshServiceRegistration(nn-sr-ak) :new-nn-sr-at,new-nn-sr-ak
+
+DN->SR: [HTTP:SSL(sr-id)/AH(dn-sr-at)] refreshServiceRegistration(dn-sr-ak) :new-dn-sr-at,new-dn-sr-ak
+
+DN->SR: [HTTP:SSL(sr-id)/AH(dn-sr-at)] acquireAccessToken(svc-type=nn) :new-dn-nn-at,nn-svc-url
+
+
+== Service Identity Certificate Roll (yearly?) ==
+
+activate I
+I->SR: [ON(sr-h)/AS(sr-u)/CLI] persistIdentityCertificate(new-sr-cert) :new-sr-id-pub-key
+I->NN: [ON(nn-h)/AS(nn-u)/CLI] persistTrustedIdentityKey(new-sr-id-pub-key)
+I->DN: [ON(dn-h)/AS(dn-u)/CLI] persistTrustedIdentityKey(new-sr-id-pub-key)
+deactivate I
+
+'note right New nn-cert returned if SR detects this is required
+NN->SR: [HTTP:SSL(sr-id)/AH(nn-sr-at)] refreshServiceRegistration(nn-sr-ak) :sr-at-pub-key,nn-sr-at,nn-sr-ak,nn-cert
+
+'note right New dn-cert returned if SR detects this is required
+DN->SR: [HTTP:SSL(sr-id)/AH(dn-sr-at)] refreshServiceRegistration(dn-sr-ak) :sr-at-pub-key,dn-sr-at,dn-sr-ak,dn-cert
+
+
+
+== Client Bootstrap ==
+
+C->C: [ON(c-h)/AS(c-u)/CLI] storeTrustedIdentityKey(sr-id-pub-key)
+
+C->IDP: [?] login(credentials) :sso-token
+
+C->SR: [HTTP:SSL(sr-id)] authenticateUser(sso-token) :c-sr-at,c-sr-ak
+
+
+== Client Interaction ==
+
+C->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)] acquireAccessToken(svc-type=nn) :c-nn-at,nn-svc-url
+
+C->NN: [RPC:SSL(sr-id)/SASL(c-nn-at)] listFiles(dir) :block-url,block-id,block-token
+
+'note right No change to DTP initially.
+C->DN: [DTP] readBlock(block-id,block-access-token) :block-data
+
+
+== Client Access Token Refresh (daily?) ==
+
+'Users must re-authenticate instead of refreshing because they can’t be trusted to store their c-sr-ak safely
+C->SR: [HTTP:SSL(sr-id)] authenticateUser(sso-token) :c-sr-at,c-sr-ak
+
+C->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)] acquireAccessToken(svc-type=nn) :c-nn-at,nn-svc-url
+
+
+== Client Identity Certificate Roll (yearly?) ==
+
+C->C: [ON(c-h)/AS(c-u)/CLI] storeTrustedIdentityKey(new-sr-id-pub-key)
+
+C->SR: [HTTP:SSL(sr-id)] authenticateUser(sso-token) :c-sr-at,c-sr-ak
+
+C->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)] acquireAccessToken(svc-type=nn) :c-nn-at,nn-svc-url
+
+@enduml
+
+
+
+== Gateway Boostrap ==
+
+'TODO:ISSUE: How does Gateway fit into this picture?
+' The authentication endpoint could wrap the AT into a GAT that it would check for in the AH and strip off inbound.
+' Would be encrypted with g-sr-ak?
+
+'TODO:ISSUE: How does a Gateway cluster of instances affect this?
+'TODO:ISSUE: How does Oozie fit into this picture (i.e. delegation tokens).
+'TODO:ISSUE: How would a cluster of NameNodes affect this?
+'TODO:ISSUE: Should the svc-url be embedded in the access-token?
+

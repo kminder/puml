@@ -1,0 +1,58 @@
+@startuml
+autonumber
+
+participant Installer as I
+participant Client as C
+participant IDP as IDP
+participant NameNode as NN
+participant DataNode as DN
+participant HSSO as SR
+
+== Service Bootstrap ==
+
+I->SR: [HTTP]\npreregister(svc-type=nn)\n:sr-reg-url,sr-pub-key,reg-code
+  activate I
+  I->NN: [Puppet]\nfirstLaunch\n(sr-reg-url,sr-pub-key,reg-code)
+    activate NN
+    NN->SR: [HTTP:SSL(sr-sp)]\nregister(reg-code,nn-svc-url)\n:nn-cert,nn-sr-at
+    deactivate NN
+  deactivate I
+
+I->SR: [HTTP]\npreregister(svc-type=dn)\n:sr-reg-url,sr-pub-key,reg-code
+  activate I
+  I->DN: [Puppet]\nfirstLaunch\n(sr-reg-url,sr-pub-key,reg-code)
+    activate DN
+    DN->SR: [HTTP:SSL(sr-it)]\nregister(reg-code,dn-svc-url)\n:dn-cert,sr-at-key,dn-sr-at
+    deactivate DN
+  deactivate I
+
+== Service Interaction ==
+
+'DN->SR:[HTTP:SSL(sr-it)/AH(dn-sr-at)]\nlookup(nn-svc-type):dn-nn-at-nn-url
+DN->SR: [RPC:SSL(nn-it)/SASL(dn-nn-at/sidtoken)]\nheartbeat(status)\n:secret??????
+
+== Service Refresh ==
+
+SR->SR: refresh():sr-at-key
+NN->SR: [HTTP:SSL(sr-it)/AH(old-nn-sr-at)]refresh():sr-at-key,new-nn-sr-at
+DN->SR: [HTTP:SSL(sr-it)/AH(old-dn-sr-at)]refresh():sr-at-key-new-dn-sr-at
+DN->SR: [HTTP:SSL(sr-it)/AH(dn-sr-at)]lookup(nn-svc-type):dn-nn-at-nn-url
+
+== Client Bootstrap ==
+
+C->IDP: login(credentials)\n:sso-token
+C->SR: [HTTP]\npreauthn()\n:sr-it-key,sr-authn-url
+C->SR: [HTTP:SSL(sr-it)]\nauthn(sso-token)\n:c-sr-at
+
+== Client Interaction ==
+
+C->SR: []lookup
+C->NN: listFiles
+
+== Client Refresh ==
+
+SR->SR: refresh():sr-at-key
+C->SR: [HTTP:SSL(sr-it)/AH(old-c-sr-at)]\nreauthn():new-c-sr-at
+C->SR: [HTTP:SSL(sr-it)/AH(c-sr-at)]\nlookup(nn-type):c-nn-at,nn-url
+
+@enduml

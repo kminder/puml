@@ -1,0 +1,41 @@
+@startuml
+title Client Mutual Authentication with HSSO (REST Client, No Gateway)
+autonumber
+hide footbox
+
+participant "Client\n(c)" as C
+participant "IdP" as IDP
+box "Hadoop Cluster/Firewall"
+  participant "HSSO\n(sr)" as SR
+  participant "NameNode\n(nn)" as NN
+  participant "DataNode\n(dn)" as DN
+end box
+
+== Install ==
+
+C->C: [ON(c-h)/AS(c-u)/CLI]\n<b>storeTrustedPublicKey</b>( sr-pub-key )
+  note right: Client acquired sr-pub-key out of band.\nAdded to truststore manually.\nUsed to validate SSL server auth.
+
+== Login ==
+
+C->SR: [HTTP:SSL(sr-id)]\n<b>discoverIdp</b>()\n: idp-type, idp-url, sr-feder-url
+  note right: Client discovers IdPs supported by cluster\nwith location to login and federate identity.
+
+C->IDP: [IdP]\n<b>login</b>( credentials )\n: sso-token
+  note right: Login via IdP specific protocol.\nReturned sso-token used for federation.
+
+C->SR: [HTTP:SSL(sr-id)]\n<b>federateIdentity</b>( sso-token )\n: c-sr-at, c-sr-ak, sr-token-url
+  note right: Client authenticates to HSSO.\nProvides crypto trusted SSO Token.\nReturned its Access Token for SR,\nAuthentication Key needed to use\nrefresh Access Tokens. c-sr-at=CAT
+
+C->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)]\n<b>acquireAccessToken</b>( svc-type=nn )\n: c-nn-at, nn-svc-url
+  note right: Client acquires Access Token for NN.\nAuthenticates HSSO with SSL server auth.\nAuthenticates itself to HSSO with client\nAccess Token in Authorization header. c-nn-at=SAT
+
+== Access ==
+
+C->NN: [HTTP:SSL(nn-id)/AH(c-nn-at)]\n<b>listFiles</b>( file )\n: block-url, block-id, block-token
+  note right: Client accesses NN to read file.\nAuthenticates NN with SSL server auth.\nAuthenticates itself to NN with client\nAccess Token in Authorization header.
+
+C->DN: [HTTP:SSL(dn-id)]\n<b>readBlock</b>( block-id, block-token )\n: block-data
+  note right: Only Block Token for\nclient auth.
+
+@enduml

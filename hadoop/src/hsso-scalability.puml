@@ -1,0 +1,19 @@
+@startuml
+title HSSO Simplified Service Registration
+autonumber
+hide footbox
+
+participant "Installer" as i
+participant "Data\nNode\n(dn)" as dn
+participant "HSSO\n(sr)" as sr
+
+i->sr: [CLI]\n<b>preregisterService</b>\n( svc-type=dn )\n: sr-pub-key, dn-rc
+  note right: An admin or agent\nacquires a Registration\nCode for a new service
+
+dn->sr: [HTTPS/sr-pub-key]\n<b>registerService</b>\n( dn-rc )\n: dn-sr-at, dn-ak
+  note right: HSSO needs to store\nmapping from dn-id\nto dn-ak somewhere
+
+dn->sr: [HTTPS/sr-pub-key]\n<b>acquireAccessToken</b>\n( dn-sr-at, svc-type=nn )\n: dn-nn-at
+  note right: HSSO needs get dn-ak\nusing dn-id somehow\nto encrypt dn-nn-at
+
+@enduml

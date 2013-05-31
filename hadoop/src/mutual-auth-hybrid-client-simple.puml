@@ -1,0 +1,29 @@
+@startuml
+autonumber
+title Client Mutual Authentication with HSSO
+
+participant "Client\n(c)" as C
+participant "IdP" as IDP
+participant "HSSO\n(sr)" as SR
+participant "NameNode\n(nn)" as NN
+participant "DataNode\n(dn)" as DN
+
+C->C: [ON(c-h)/AS(c-u)/CLI]\nstoreTrustedIdentityKey( sr-pub-key )
+  note right: Client acquired sr-pub-key out of band.\nAdded to truststore manually.
+
+C->IDP: [IdP]\nlogin( credentials )\n: sso-token
+  note right: IdP login via required protocol.
+
+C->SR: [HTTP:SSL(sr-id)]\nauthenticateUser( sso-token )\n: c-sr-at, c-sr-ak
+  note right: Client authenticates to HSSO.\nProvides trusted SSO Token.\nReturned its Access Token for SR,\nAuthentication Key needed to use\nacquired Access Tokens.
+
+C->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)]\nacquireAccessToken( svc-type=nn )\n: c-nn-at, nn-svc-url
+  note right: Client acquires Access Token for NN.\nAuthenticates HSSO with SSL server auth.\nAuthenticates itself to HSSO with client\nAccess Token in Authorization header.
+
+C->NN: [RPC:SSL(sr-id)/SASL(c-nn-at)]\nlistFiles( dir )\n: block-url, block-id, block-token
+  note right: Client accesses NN.\nAuthenticates NN with SSL server auth.\nAuthenticates itself to NN with client\nAccess Token in SASL exchange.
+
+C->DN: [DTP]\nreadBlock( block-id, block-token )\n: block-data
+  note right: No change to DTP initially.
+
+@enduml

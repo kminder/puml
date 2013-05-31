@@ -1,0 +1,63 @@
+@startuml
+title Client Mutual Authentication with HSSO (REST Client, Gatekeeper/Gateway)
+autonumber
+hide footbox
+
+participant "Client\n(c)" as C
+participant "IdP" as IDP
+participant "Gatekeeper\n(gk)" as GK
+box "Hadoop Cluster/Firewall"
+  participant "Gateway\n(gw)" as GW
+  participant "HSSO\n(sr)" as SR
+  participant "Name\nNode\n(nn)" as NN
+  participant "Data\nNode\n(dn)" as DN
+end box
+
+== Install ==
+
+C->C: [ON(c-h)/AS(c-u)/CLI]\n<b>storeTrustedPublicKey</b>( g*-pub-key )
+  note right: Client acquires g*-pub-key out of band.\nAdds to truststore manually.\nUsed to validate SSL server auth.
+
+== Login ==
+
+C->GK: [HTTP:SSL(g*-id)]\n<b>discoverIdp</b>()\n: idp-type, idp-url, gk-feder-url
+  note right: Client discovers IdPs supported by cluster\nwith GK location to login and federate identity.
+
+C->IDP: [IdP]\n<b>login</b>( credentials )\n: sso-token
+  note right: Login via IdP specific protocol.\nReturned sso-token used for federation.
+
+C->GK: [HTTP:SSL(g*-id)]\n<b>federateIdentity</b>( sso-token )\n: c-sr-at, c-sr-ak, gw-sr-token-url
+  note right: Client federates to HSSO via GK.\nProvides crypto trusted SSO Token.\nReturned its GW Access Token for SR,\nAuthentication Key needed to use\nrefresh Access Tokens. c-sr-at=CAT
+  activate GK
+  GK->GW: [HTTP:SSL(g*-id)]\n<b>federateIdentity</b>( gk-norm-token )\n: c-sr-at, c-sr-ak, gw-sr-token-url
+    note right: GK normalizes SSO Token, dispatches to GW.
+    activate GW
+    GW->SR: [HTTP:SSL(sr-id)]\n<b>federateIdentity</b>( gk-norm-token )\n: c-sr-at, c-sr-ak, sr-token-url
+    note left: GW dispatches to HSSO, rewrites URL.
+    deactivate GW
+  deactivate GK
+
+C->GW: [HTTP:SSL(g*-id)/AH(c-sr-at)]\n<b>acquireAccessToken</b>( svc-type=nn )\n: c-nn-at, gw-nn-svc-url
+  note right: Client acquires Access Token for NN via GW. c-nn-at=SAT
+  activate GW
+  GW->SR: [HTTP:SSL(sr-id)/AH(c-sr-at)]\n<b>acquireAccessToken</b>( svc-type=nn )\n: c-nn-at, nn-svc-url
+  note left: GW dispatches to HSSO, rewrites URL.
+  deactivate GW
+
+== Access ==
+
+C->GW: [HTTP:SSL(g*-id)/AH(c-nn-at)]\n<b>readFile</b>( file )\n: gw-block-url, block-id, block-token
+  note right: Client accesses NN to read file via GW.
+  activate GW
+  GW->NN: [HTTP:SSL(nn-id)/AH(c-nn-at)]\n<b>readFile</b>( block-url, block-id, block-token )\n: block-token
+  note left: GW dispatches to NN, rewrites URLs.
+  deactivate GW
+
+C->GW: [HTTP:SSL(g*-id)]\n<b>readBlock</b>( block-id, block-token )\n: block-data
+  note right: Only Block Token for\nclient auth.
+  activate GW
+  GW->DN: [HTTP:SSL(dn-id)]\n<b>readBlock</b>( block-id, block-token )\n: block-data
+  note left: GW dispatches to DN.\nMay rewrite URLs in body.
+  deactivate GW
+
+@enduml

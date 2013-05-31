@@ -1,0 +1,67 @@
+@startuml
+autonumber
+title Service Mutual Authentication with HSSO
+
+participant Installer as I
+participant "HSSO\n(sr)" as SR
+participant "NameNode\n(nn)" as NN
+participant "DataNode\n(dn)" as DN
+
+'sr = Service Registry
+'nn = Name Node
+'svc = Service
+'cert = Certificate
+'pub-key = Public Key
+'pri-key = Private Key
+'ms = Master Secret
+'rc = Registration Code
+'ak = Authentication Key (opaque unique key known only by SR and svc/c. Like Kerberos service password)
+'at = Access Token (See structure below)
+'sk = Session Key (opaque unique key shared between client and service. Like Kerberos SessionKey)
+'id = Identity (as in the identity asserted via SSL handshake)
+'[Protocol:ServerAuth(data)/ClientAuth(identity)]
+'reg-code = Registration code.  Short lived one time code.
+
+'Access Token Structure
+'x-y-at = encrypted with x-sr-ak {
+'           encrypted with y-sr-ak { x-id, y-id, x-attrs, x-privs, expiry, x-y-sk }
+'           [x-id,] y-id, expiry, x-y-sk }
+' For SASL Mutual Authentication:
+'   Consumer decrypts access-token with x-sr-ak and sends (AH/SASL) inner encrypted part to Service as client auth.
+'   Service decrypts with y-sr-ak and encrypts x-id with x-y-sk and returns result to Consumer.
+'   Consumer decrypts result with x-y-sk and verifies result matches x-id as server auth.
+' Note: This mechanism only used with SASL mutual auth required and SSL not available.
+
+'TODO:ISSUE: What can someone do with a stolen *-*-ak or *-*-sk?
+
+'I->oSR: [ON(sr-h)/AS(sr-u)/CLI]\nfirstServiceStart( sr-cert )
+'  note right: Provide HSSO with its initial cluster specific cert.
+  activate I
+  I->SR: [ON(sr-h)/AS(sr-u)/CLI]\npreregisterService( svc-type=nn )\n:sr-pub-key, sr-reg-url, nn-reg-code
+    note right: Get information required for registration.\nHSSO Public Key, Registration URL, Registration Code
+  I->NN: [ON(nn-h)/AS(nn-u)/CLI]\nfirstStart( sr-pub-key, sr-reg-url, nn-reg-code )
+    note right: Start new service for the first time.\nProviding registration details.
+    activate NN
+    NN->SR: [HTTP:SSL(sr-id)]\nregisterService( nn-reg-code, nn-svc-url )\n:nn-cert, nn-sr-at, nn-ak
+    note left: Service registers itself with HSSO.\nProvides Registration Code and its URL.\nReturned its cert, Access Token for SR,\nAuthentication Key used to validate\nclient Access Tokens.
+    deactivate NN
+
+  I->SR: [ON(sr-h)/AS(sr-u)/CLI]\npreregisterService( svc-type=dn )\n:sr-pub-key, sr-reg-url, dn-reg-code
+    note right: Get information required for registration.\nHSSO Public Key, Registration URL, Registration Code
+  I->DN: [ON(dn-h)/AS(dn-u)/CLI]\nfirstStart( sr-pub-key, sr-reg-url, dn-reg-code )
+    activate DN
+    DN->SR: [HTTP:SSL(sr-id)]\nregisterService( dn-reg-code, dn-svc-url )\n:dn-cert, dn-sr-at, dn-ak
+    note left: Service registers itself with HSSO.\nProvides Registration Code and its URL.\nReturned its cert, Access Token for SR,\nAuthentication Key used to validate\nclient Access Tokens.
+    deactivate DN
+  deactivate I
+
+'note right DataNode must verify that sr-id from SSL matches sr-id in dn-sr-at
+DN->SR: [HTTP:SSL(sr-id)/AH(dn-sr-at)]\nacquireAccessToken( svc-type=nn )\n:dn-nn-at, nn-svc-url
+  note left: DN acquires access-token for NN.\nAuthenticates HSSO with SSL server auth.\nAuthenticates itself to HSSO with client\nAccess Token in Authorization header.
+
+'note right DataNode must verify that nn-id from SSL matches nn-id in dn-nn-at.
+'note right SASL can also provide mutual auth given access-token.
+DN->NN: [RPC:SSL(nn-id)/SASL(dn-nn-at)]\nheartbeat( status )\n:block-access-token-secret
+  note left: DN accesses NN.\nAuthenticates NN with SSL server auth.\nAuthenticaets itself to NN with client\nAccess Token in SASL exchange.
+
+@enduml

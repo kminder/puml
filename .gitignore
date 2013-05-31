@@ -1,6 +1,10 @@
-*.class
+# Project Files #
+*.ipr
+*.iws
+*.iml
 
-# Package Files #
+# Compiled Files #
+*/out
+
+# Libraries #
 *.jar
-*.war
-*.ear

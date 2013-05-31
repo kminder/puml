@@ -1,0 +1,36 @@
+@startuml
+autonumber
+
+participant Client as C
+participant "ResourceManager\nScheduler+AppsMgr" as RM
+participant NodeManager as NM
+participant ApplicationMaster as AM
+participant ApplicationContainer as AC
+'participant NameNode as NN
+'participant DataNode as DN
+
+== Startup ==
+
+NM->RM: nodeStatus
+
+== Job Definition ==
+
+== Job Submission ==
+
+C->RM: submitJob
+
+== Job Initiation ==
+
+AM->RM: resourceRequest
+
+== Map Execution ==
+
+AC->AM: jobStatus
+
+== Reduce Execution ==
+
+AC->AM: jobStatus
+
+== Job Completion ==
+
+@enduml
