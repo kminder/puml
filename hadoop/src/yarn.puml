@@ -3,62 +3,87 @@ title Secure Map Reduce 2
 autonumber
 hide footbox
 
-participant "Client" as C
-participant "Resource\nManager" as RM
-participant "Node\nManager" as NM
-participant "Application\nMaster" as AM
-participant "Application\nContainer" as AC
-'participant "NameNode" as NN
-'participant "DataNode" as DN
+participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+participant "Node\nManager\n(nm)" as NM
+participant "Application\nMaster\n(am)" as AM
+participant "Application\nContainer\n(ac)" as AC #red
+participant "Task\n(t)" as T #orange
+participant "File\nSystem\n(fs)" as FS
+participant "Name\nNode\n(nn)" as NN
+participant "Data\nNode\n(dn)" as DN
 
 == Bootstrap ==
 
-NM->RM: [] nodeStatus()
-'DN->NN: heartbeat( status ): block-token-secret
+NM->RM: [?] nodeStatus()
+DN->NN: heartbeat( status ): <b>block-token-secret</b>
 
 == Job Definition ==
 
   note over C,RM: Client uses HDFS to define job.\nDo they use AM to do anything first?
+C->NN: [RPC:SASL(c/nn)] mkdir( job-dir )
+C->NN: [RPC:SASL(c/nn)] writeFile(): block-id, block-location, <b>block-access-token</b>
+C->DN: [DTP(<b>block-access-token</b>)] readBlock( block-id ): block-data
 
 == Job Submission ==
 
-C->RM: [] submitJob()
+C->RM: [?] submitJob( job-dir? )
+  note right: Is the job-id acquired before it is defined?
 
 == Job Initiation ==
 
-RM->RM: [] allocateResource()
-RM->NM: [] launchContainer( launch-spec=mr2 )
+RM->RM: [?] allocateResource()
+RM->NM: [?] launchContainer( launch-spec=mr2, <b>tokens?</b> )
   create AM
 NM->AM: [CLI as ?] exec()
+  note over AM: How do ApplicationTokens, ContainerTokens\nand DelegationTokens come into play?
   activate AM
-AM->RM: [] register()
+AM->RM: [?] register()
 
-== Map Execution ==
+== Map Task Execution ==
 
-AM->RM: [] negotateResources(): ContainerInfo
-AM->NM: [] launchContainer( launch-spec=map-task )
+AM->RM: [?] negotateResources(): ContainerInfo
+AM->NM: [?] launchContainer( launch-spec=map-task, <b>tokens?</b> )
   create AC
 NM->AC: [CLI as ?] exec()
+  note right #red: setuid?
   note over AC: Does AC exec a setuid program?
   activate AC
-AC->AM: [] jobStatus()
+  create T
+AC->T: [CLI as c] exec()
+  note right #green: Map Task
+  activate T
+  T->NN: [?] readFile
+  T->DN: [?] readBlock
+  deactivate T
+  destroy T
+AC->AM: [?] jobStatus()
   note right: How does AC access AM?\nWhat does AC do now?
   deactivate AC
   destroy AC
 
 == Status Query ==
 
-C->AM: [] statusQuery()
+C->AM: [?] statusQuery()
+  note right: How does C know how to access AM?
 
-== Reduce Execution ==
+== Reduce Task Execution ==
 
-AM->RM: [] negotateResources(): ContainerInfo
-AM->NM: [] launchContainer( launch-spec=map-task )
+AM->RM: [?] negotateResources(): ContainerInfo
+AM->NM: [?] launchContainer( launch-spec=map-task, <b>tokens</b> )
   create AC
 NM->AC: [CLI as ?] exec()
   note right: Are different containers used\nfor Map and Reduce Tasks?
   activate AC
-AC->AM: [] jobStatus()
+  create T
+AC->T: [CLI as c] exec()
+  note right #green: Reduce Task
+  activate T
+  T->NN: [?] writeFile
+  T->DN: [?] writeBlock
+  deactivate T
+  destroy T
+AC->AM: [?] jobStatus()
   deactivate AC
   destroy AC
 
