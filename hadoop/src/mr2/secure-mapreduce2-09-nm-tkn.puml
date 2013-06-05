@@ -21,37 +21,80 @@ participant "Application\nMaster\n(am)" as AM
 
 == Bootstrap ==
 
+'1
 RM->RM:<b>createNodeManagerTokenSecretKey()\n : nm-tkn-sk
-NM->RM:<b>register/heartbeat\n [RSKT(nm-rm-kst)]\n ( nm-status )\n : nm-tkn-sk, ac-tkn-sk
+  note right: Secret shared with NodeManagers\nto verify NodeManager Tokens.
+
+'2
+NM->RM:<b>register/heartbeat</b>( ... )\n : nm-tkn-sk, ...
+  note right: Share nm-tkn-sk with NodeManagers.
+
+== Job Submission ==
 
 == Job Initiation ==
 
-[->RM: submitApplication
+'3
+[->RM: <b>runJob?
+  note right #green: Q1: What is the mechanism by which jobs are discovered on the queue?
   activate RM
-RM->RM: <b>allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
+
+'4
+RM->RM: <b>allocateResources</b>( ... )
+  note right: Call to self to allocate resources for MapReduce AppMaster.
   activate RM
-RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mra-nm-tkn
-RM<--RM: mr-rsrc-res{nm-tkn,ac-tkn}
+
+'5
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : am-nm-tkn
+  note right: NodeManager Token to access NodeManager and\nstart AppContainer for MapReduce AppMaster.
+
+'6
+RM<--RM: <b>:mr-rsrc-res</b>{am-nm-tkn,...}
+  note right: NM Token returned from allocationResources()\nas part of AllocatedContainer.
   deactivate RM
-RM->NM: <b>startContainer\n [RSKT(rm-nm-kst)]\n ( mr-rsrs-res{nm-tkn,ac-tkn}, rm-tokens )
+
+'7
+RM->NM: <b>startContainer\n [RSAT(am-nm-tkn)]\n ( ... )
+  note right: SASL verifies am-nn-tkn with nn-tkn-sk
   deactivate RM
 
 == Map Task Execution ==
 
-AM->RM: <b>allocateResources\n [RSAT(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+'8
+AM->RM: <b>allocateResources</b>( ... )
+  note right: Allocate AppContainer\nfor MapTask
   activate RM
+
+'9
 RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mt-nm-tkn
-AM<--RM: mt-container-res{nm-tkn,ac-tkn}
+  note right: NodeManager token to access NodeManager\nand start AppContainer for MapTask.
+
+'10
+AM<--RM: <b>:mt-rsrc-res</b>{mt-nm-tkn,...}
+  note right: NM Token returned\nfrom allocationResources()\nas part of AllocatedContainer.
   deactivate RM
-AM->NM: <b>startContainer\n [RSAT(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
+
+'11
+AM->NM: <b>startContainer\n [RSAT(mt-nm-tkn)]\n ( ... )
+  note left: SASL verifies mt-nn-tkn with nn-tkn-sk
 
 == Reduce Task Execution ==
 
-AM->RM: <b>allocateResources\n [RSAT(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+'12
+AM->RM: <b>allocateResources</b>( ... )
+  note right: Allocate AppContainer\nfor ReduceTask
   activate RM
-RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mt-nm-tkn
-AM<--RM: mt-container-res{nm-tkn,ac-tkn}
-  deactivate RM
-AM->NM: <b>startContainer\n [RSAT(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
 
-@enduml
+'13
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : rt-nm-tkn
+  note right: NodeManager Token to access NodeManager\nand start AppContainer for ReduceTask.
+
+'14
+AM<--RM: <b>:mt-rsrc-res</b>{rt-nm-tkn,...}
+  note right: NM Token returned\nfrom allocationResources()\nas part of AllocatedContainer.
+  deactivate RM
+
+'15
+AM->NM: <b>startContainer\n [RSAT(rt-nm-tkn)]\n ( ... )
+  note left: SASL verifies rt-nn-tkn with nn-tkn-sk
+
+@enduml                                                                                      
