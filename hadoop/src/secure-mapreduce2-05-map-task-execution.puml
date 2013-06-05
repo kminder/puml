@@ -1,0 +1,89 @@
+@startuml
+title Secure Map Reduce 2 - Map Task Execution
+autonumber
+hide footbox
+
+'participant "Client\n(c)" as C
+participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+participant "Resource\nManager\n(rm)" as RM
+participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+participant "Shuffle\nService\n(ss)" as SS
+participant "Application\nContainer\n(ac)" as AC #red
+participant "Task\n(t)" as T #orange
+participant "File\nSystem\n(fs)" as FS
+participant "Name\nNode\n(nn)" as NN
+participant "Data\nNode\n(dn)" as DN
+
+  'note over C,DN #green: QUESTION ?
+
+'1
+AM->RM: allocateResources\n [RPC:SASL(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+
+'2
+AM->NM: startContainer\n [RPC:SASL(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
+  note right: service-secrets used by NM/ShuffleService.\nContains shuffle-tkn.
+
+  activate NM
+'3
+NM->FS: writeTokensFile( ?????-tokens )
+  note left: ac-tkn, c-nn-dt, ...
+
+  create AC
+
+  note over AM,DN #green: QUESTION: Run as submitting user, root, setuid/both?
+
+'4
+NM->AC: exec\n [as ?]\n ( serialized-secrets-loc )
+  note right #red: Map Task Container
+
+  deactivate NM
+  activate AC
+
+  note over AM,DN #green: QUESTION: Does AC extract job files from HDFS? e.g. JAR?
+'5
+AC->FS: extractFiles?
+  note left: For example Job JAR file?  TODO
+  create T
+
+  note over AM,DN #green: QUESTION: Run as submitting user?
+  note over AM,DN #green: QUESTION: Is this run out-of-process at all? e.g. streaming
+
+'6
+AC->T: exec\n [as c]\n ()
+  note right #orange: Map Task
+  activate T
+
+'7
+T->FS: readTokensFile():
+  note left: Loads secrets/tokens from local disk.\nLocation provided by env var.
+
+'8
+T->NN: readFile\n [RPC:SASL(<b>c-deleg-tkn</b>,nn)]\n ( split-file )\n : blk-id, blk-loc, blk-tkn
+
+'9
+T->DN: readBlock\n [DTP(<b>blk-tkn</b>)]\n ( blk-id )\n: split-blk-data
+
+'10
+T->T: map( split-data ): shuffle-data
+  note left: Map logic to transform\nsplit-data into shuffle-data
+
+note over AM,DN #green: QUESTION: Does the task to this or the AC?
+
+'11
+T->FS: writeShuffleData
+  note left: Write shuffle-data so that SS can serve it to reduce tasks.
+
+  deactivate T
+  destroy T
+
+'12
+AC->AM: status\n [RPC:SASL(#job-tkn)]\n ( app-status )
+  note right: How does AC access AM?\nWhat does AC do now?
+  deactivate AC
+  destroy AC
+
+note over AM,DN #green: QUESTION: Does something report status to HS?
+
+@enduml

@@ -1,0 +1,66 @@
+@startuml
+title Secure Map Reduce 2 - Map Reduce Job Definition
+autonumber
+hide footbox
+
+participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nService\n(ss)" as SS
+participant "History\nServer\n(hs)" as HS
+'participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+participant "Name\nNode\n(nn)" as NN
+participant "Data\nNode\n(dn)" as DN
+
+  'note over C,DN #green: QUESTION: ?
+
+  activate C
+'1
+C->RM: createJob\n[RPC:SASL(c-kp,rm-kp)]\n()\n: job-id
+  note right: Used to create\nstaging job-dir.
+
+'2
+  opt if tasks will create new jobs
+C->RM: getResourceManagerDelegationToken\n[RPC:SASL(c-kp,rm-kp)]\n()\n: c-rm-dt
+  note right: e.g. Used by\nOozie tasks
+  end opt
+
+'3
+C->HS: getHistoryServerDelegationToken\n[RPC:SASL(c-kp,hs-kp)]\n()\n: c-hs-dt
+  note right: To access HS for\ncompleted job status
+
+'4
+C->NN: getNameNodeDelegationToken\n[RPC:SASL(c-kp,nn-kp)]\n()\n: c-nn-dt
+  note right: For tasks to\naccess HDFS data.
+
+  note over C,DN #green: QUESTION: Is this a secret key or a token?
+'5
+C->C: createShuffleTokenSecretKey()\n: shuffle-tkn-sk
+  note right: Used by reduce tasks\nto fetch shuffle data\nfrom NM/ShuffleService.
+
+'6
+C->C: generateShuffleToken\n ( shuffle-tkn-sk ) \n: shuffle-sk
+
+note over C,DN #green: QUESTION: What tokens/secrets are included exactly?
+
+'7
+C->C: serializeTokens\n( c-nn-dt, c-hs-dt, c-rm-dt, shuffle-tkn )\n: c-tokens
+  note right: Serialize all tokens and secret\nkeys to a byte array.\nPassed to RM during submit.
+
+'8
+C->NN: mkdir\n [RPC:SASL(c-kp,nn-kp)]\n ( job-dir )
+  note right: Create job staging\ndir in HDFS.
+
+  loop job-conf, splits, etc.
+'9
+C->NN: writeFile\n [RPC:SASL(c-kp,nn-kp)]\n ()\n : blk-id, blk-loc, blk-tkn
+
+'10
+C->DN: writeBlock\n [DTP(blk-tkn)]\n ( blk-id, blk-data )
+  end loop
+
+@enduml

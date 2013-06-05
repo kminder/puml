@@ -1,0 +1,58 @@
+@startuml
+title Secure Map Reduce 2 - Map Reduce Job Submission
+autonumber
+hide footbox
+
+participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+'participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nService\n(ss)" as SS
+'participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+
+  'note over C,RM #green: QUESTION: ?
+
+  activate C
+
+  note over C,RM #green: QUESTION: How does RM know this is a MR app and which AM impl to use?
+
+'1
+C->RM: submitApplication\n [RPC:SASL(c-kp,rm-kp)]\n ( job-dir, c-tokens )\n : app-rpt{client-tkn}
+  note right: Serialize client's c-tokens include:\nc-nn-dt, c-hs-dt, c-rm-dt, shuffle-tkn
+
+  activate RM
+
+  note over C,RM #green: QUESTION: When was the client-tkn-sk created?
+
+'2
+RM->RM: createClientTokenSecretKey()\n : client-tkn-sk
+  note left: To validate client-tkn
+
+'3
+RM->RM: generateClientToken\n ( client-tkn-sk )\n : client-tkn
+  note left: For the C to talk to AM.
+
+  note over C,RM #green: QUESTION: When was the am-tkn-sk created?
+
+RM->RM: createApplicaitonMasterTokenSecretKey()\n : am-tkn-sk
+  note left: To validate am-tkn
+
+'4
+RM->RM: generateApplicationMasterToken\n ( am-tkn-sk )\n : am-tkn
+  note left: For AM to talk to the RM.
+
+'5
+C<--RM: app-rpt{client-tkn{am-id}}
+  note right: ApplicationReport contains\nclient-tkn which contain\nam-id
+
+  deactivate RM
+  deactivate C
+
+
+@enduml

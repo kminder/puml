@@ -1,0 +1,88 @@
+@startuml
+title Secure Map Reduce 2 - Map Reduce Job Initiation
+autonumber
+hide footbox
+
+'participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+participant "Shuffle\nService\n(ss)" as SS
+participant "Application\nMaster\n(am)" as AM
+participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+participant "File\nSystem\n(fs)" as FS
+participant "Name\nNode\n(nn)" as NN
+participant "Data\nNode\n(dn)" as DN
+
+  'note over RM,DN #green: QUESTION ?
+
+  activate RM
+
+'1
+RM->RM: allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
+  note right: RM allocates resources\nwith itself for running MR AM.\nTokens from boostrap.
+
+  activate RM
+
+'2
+RM->RM: generateNodeManagerToken\n ( nm-tkn-sk )\n : nm-tkn
+
+'3
+RM->RM: generateApplicationContainerToken\n ( ac-tkn-sk )\n : ac-tkn
+
+'4
+RM<--RM: mr-cntr-res{nm-tkn,ac-tkn}
+
+'5
+RM->RM: serializeTokens( c-tokens, cs-tkn, ac-tkn ): rm-tokens
+
+  deactivate RM
+
+'6
+RM->NM: startContainer\n [RPC:SASL(rm,nm)]\n ( mr-rsrc-res, rm-tokens )
+  note right: tokens: deleg, shuffle, client, app
+
+  deactivate RM
+  activate NM
+
+'7
+  create SS
+NM->SS: start?
+
+'8
+NM->FS: writeTokenFile\n ( rm-tokens )
+  note left: Write secrets to local token-file.\nIncludes client-token, protected\nby OS permissions
+  create AM
+
+  note over RM,DN #green: QUESTION: What user is the AM run as?
+
+'9
+NM->AM: exec\n [as rm?]\n ( job-dir, serialized-secrets-loc )
+  activate AM
+  note left: Provided the location\nof the token file via env
+
+  deactivate NM
+
+'10
+AM->AM: generateJobToken\n ( job-tkn-sk )\n : job-tkn
+
+'11
+AM->RM: register\n [RPC:SASL(app-tkn?????]\n ()
+  note right: Lets NM know MR App is alive.
+
+'12
+  create CS
+AM->CS: start( client-tkn-sk? )
+  note right: A listener for Client\nto query job status.
+
+'AM uses the app token provided in the token file.
+'This token file has user-only read perms.
+'The AM then starts and RPC listener (client-service) for the client to talk to the client-app
+'client-service is protected by the client-secret
+'job-client polls RM and finds it running
+'job-client switches to polling client-service for status
+'MR app creates the JobToken
+
+@enduml

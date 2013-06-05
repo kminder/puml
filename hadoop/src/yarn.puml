@@ -5,6 +5,7 @@ hide footbox
 
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
+participant "History\nServer\n(hs)" as HS
 participant "Node\nManager\n(nm)" as NM
 participant "Application\nMaster\n(am)" as AM
 participant "Application\nContainer\n(ac)" as AC #red
@@ -13,53 +14,101 @@ participant "File\nSystem\n(fs)" as FS
 participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
 
+== Install ==
+
+
 == Bootstrap ==
 
-NM->RM: nodeStatus\n [?]\n ()\n :  
+DN->NN: heartbeat\n [?]\n ( status )\n: <b>blk-tkn-secret</b>
 
-DN->NN: heartbeat\n [?]\n ( status )\n: <b>blk-tkn-secret</b> 
+NM->RM: heartbeat\n [?]\n ()\n : nm-secret-key, container-secret-key
+  note right: Cycled daily?
 
 
 == Job Definition ==
 
-  note over C,RM: Client uses HDFS to define job.\nDo they use AM to do anything first?
+  activate C
+C->RM: createJob(): job-id
+  note right: Used to identify job-dir
 
-C->NN: mkdir\n [RPC:SASL(c,nn)]\n ( job-dir )  
+C->NN: createDelegationToken(): c-nn-deleg-token
 
-C->NN: writeFile\n [RPC:SASL(c,nn)]\n ()\n : blk-id, blk-loc, <b>blk-access-tkn</b>  
+C->RM: createDelegationToken(): c-rm-deleg-token
+  note right: Optional, e.g. Oozie
 
-C->DN: readblk\n [DTP(<b>blk-access-tkn</b>)]\n ( blk-id ): blk-data  
+C->HS: createDelegationToken(): c-hs-deleg-token
+  note right: For completed job status
+
+C->C: createShuffleSecret(): shuffle-secret
+  note right: Used to fetch data from NM
+
+C->NN: mkdir\n [RPC:SASL(c,nn)]\n ( job-dir )
+
+  loop job-conf, splits, etc.
+C->NN: writeFile\n [RPC:SASL(c,nn)]\n ()\n : blk-id, blk-loc, <b>blk-access-tkn</b>
+
+C->DN: writeBlock\n [DTP(<b>blk-access-tkn</b>)]\n ( blk-id ): blk-data
+  end group
+
+C->C: serializeTokens( TODO ): serialized-tokens
 
 
 == Job Submission ==
 
-C->RM: submitJob\n [?]\n ( job-dir? )\n :  
-  note right: Is the job-id acquired before it is defined?
+C->RM: submitApplication\n [?]\n ( job-dir, serialized-tokens )
+  note right: Tokens also includes c-rm-deleg-token
+  activate RM
+  RM->RM: generateClientSecret(): client-secret
+    note right: For the C to talk to AM.\nShould this be a token?
+  RM->RM: generateApplicationToken(): app-token
+    note right: For AM to talk to the RM.
+  C<--RM: app-report{client-token{app-id}}
+  deactivate RM
+  deactivate C
 
 == Job Initiation ==
 
-RM->RM: allocateResource\n [?]\n ()\n : 
+RM->RM: allocateResource\n ()\n : mr-container-spec{nm-token,container-token}
+   note right: RM allocates resources\nwith itself for running AM
 
-RM->NM: launchContainer\n [?]\n ( spec=mr2, <b>tokens?</b> ) 
+RM->NM: startContainer\n [?]\n ( mr-container-spec, serialized-tokens )
+  note right: tokens: deleg, shuffle, client, app
+  activate NM
+NM->FS: write( serialized-tokens )
+  note right: Includes client-token, protected by OS permissions
   create AM
 
-NM->AM: exec\n [as ?]\n ()  
-  note over AM: How do ApplicationTokens, ContainerTokens\nand DelegationTokens come into play?
+NM->AM: exec\n [as rm?]\n ( job-dir, serialized-tokens-loc)
   activate AM
+  note right: Provided the location of the token file via env
+  deactivate NM
 
-AM->RM: register\n [?]\n ()  
+AM->RM: register\n [?]\n ( app-token )
+'AM uses the app token provided in the token file.
+'This token file has user-only read perms.
+'The AM then starts and RPC listener (client-service) for the client to talk to the client-app
+'client-service is protected by the client-secret
+'job-client polls RM and finds it running
+'job-client switches to polling client-service for status
+'MR app creates the JobToken
 
 == Map Task Execution ==
 
-AM->RM: negotateResources\n [?]\n ()\n : ContainerInfo?  
+AM->RM: allocateResources\n [?]\n (spec)\n : ContainerInfo(nm-token,container-token)
 
-AM->NM: launchContainer\n [?]\n ( spec=map, <b>tokens?</b> )  
+AM->NM: startContainer\n [nm-token]\n ( spec=map, <b>tokens byte buffer A&C,D</b> )
   create AC
+'NM writes a token file
+'Also sends service data that is used by the shuffle service
+'This call contains the container-token to authn token to NM.
 
 NM->AC: exec\n [as ?]\n () 
   note right #red: setuid?
   note over AC: Is AC exec a setuid program?
   activate AC
+
+'Task starts and loads all tokens from local disk.
+'Task talks to AM status/heartbeat/completion/failure (umbillical) (job-token secured)
 
 AC->FS: extractFiles?
   note right: Does AC extract the job files from HDFS?
@@ -78,11 +127,17 @@ AC->AM: jobStatus\n [?]\n ()
   deactivate AC
   destroy AC
 
+'MR service running in the node manager.  Has the shuffle service has the shuffle secret.
+'Task talked to NM (shuffle-service) to get shuffle data.
+'How does the shuffle service get the shuffle token.
 
 == Status Query ==
 
 C->AM: statusQuery [?] ()
   note right: How does C know how to access AM?
+
+'C->MRHS
+'Client calls the MRHS after the AM is finished.
 
 == Reduce Task Execution ==
 
