@@ -1,0 +1,57 @@
+@startuml
+title Secure Map Reduce 2 - Node Manager Token Flow
+autonumber
+'hide footbox
+
+'participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nService\n(ss)" as SS
+participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+'participant "Kerberos\nKDC" as KDC
+
+'note over C,KDC #green: QUESTION ?
+
+== Bootstrap ==
+
+RM->RM:<b>createNodeManagerTokenSecretKey()\n : nm-tkn-sk
+NM->RM:<b>register/heartbeat\n [RSKT(nm-rm-kst)]\n ( nm-status )\n : nm-tkn-sk, ac-tkn-sk
+
+== Job Initiation ==
+
+[->RM: submitApplication
+  activate RM
+RM->RM: <b>allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
+  activate RM
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mra-nm-tkn
+RM<--RM: mr-rsrc-res{nm-tkn,ac-tkn}
+  deactivate RM
+RM->NM: <b>startContainer\n [RSKT(rm-nm-kst)]\n ( mr-rsrs-res{nm-tkn,ac-tkn}, rm-tokens )
+  deactivate RM
+
+== Map Task Execution ==
+
+AM->RM: <b>allocateResources\n [RSAT(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+  activate RM
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mt-nm-tkn
+AM<--RM: mt-container-res{nm-tkn,ac-tkn}
+  deactivate RM
+AM->NM: <b>startContainer\n [RSAT(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
+
+== Reduce Task Execution ==
+
+AM->RM: <b>allocateResources\n [RSAT(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+  activate RM
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mt-nm-tkn
+AM<--RM: mt-container-res{nm-tkn,ac-tkn}
+  deactivate RM
+AM->NM: <b>startContainer\n [RSAT(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
+
+@enduml

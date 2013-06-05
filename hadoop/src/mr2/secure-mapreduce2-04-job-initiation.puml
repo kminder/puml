@@ -32,7 +32,7 @@ RM->RM: <b>allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
 RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : nm-tkn
 
 '3
-RM->RM: createApplicationContainerToken\n ( ac-tkn-sk )\n : ac-tkn
+RM->RM: <b>createApplicationContainerToken\n ( ac-tkn-sk )\n : ac-tkn
 
 '4
 RM<--RM: <b>: mr-rsrc-res{nm-tkn,ac-tkn}

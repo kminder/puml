@@ -20,10 +20,10 @@ participant "Data\nNode\n(dn)" as DN
   'note over C,DN #green: QUESTION ?
 
 '1
-AM->RM: <b>allocateResources\n [RPC:SASL(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
+AM->RM: <b>allocateResources\n [RSAT(am-tkn)]\n ( mt-container-req )\n : mt-container-res{nm-tkn,ac-tkn}
 
 '2
-AM->NM: <b>startContainer\n [RPC:SASL(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
+AM->NM: <b>startContainer\n [RSAT(nm-tkn)]\n ( mt-container-res, serialized-secrets, service-secrets )
   note right: service-secrets used by NM/ShuffleService.\nContains shuffle-tkn.
 
   activate NM
@@ -62,10 +62,10 @@ T->FS: <b>readTokensFile</b>():
   note left: Loads secrets/tokens from local disk.\nLocation provided by env var.
 
 '8
-T->NN: <b>readFile\n [RPC:SASL(<b>c-deleg-tkn</b>,nn)]\n ( split-file )\n : blk-id, blk-loc, blk-tkn
+T->NN: <b>readFile\n [RSAT(c-nn-dt)]\n ( split-file )\n : blk-id, blk-loc, blk-tkn
 
 '9
-T->DN: <b>readBlock\n [DTP(<b>blk-tkn</b>)]\n ( blk-id )\n: split-blk-data
+T->DN: <b>readBlock\n [DTP(blk-tkn)]\n ( blk-id )\n: split-blk-data
 
 '10
 T->T: <b>map</b>( split-data ): shfl-data
