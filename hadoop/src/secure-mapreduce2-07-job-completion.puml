@@ -1,8 +1,9 @@
 @startuml
 title Secure Map Reduce 2 - Job Completion
 autonumber
-hide footbox
+'hide footbox
 
+participant "Kerberos\nKDC" as KDC
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 participant "History\nServer\n(hs)" as HS
@@ -17,5 +18,7 @@ participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
 
   'note over C,DN #green: QUESTION ?
+
+AM->HS: status [RSDT(c-hs-dt)] ( job-status )
 
 @enduml

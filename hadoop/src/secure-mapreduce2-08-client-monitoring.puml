@@ -1,8 +1,9 @@
 @startuml
 title Secure Map Reduce 2 - Client Monitoring
 autonumber
-hide footbox
+'hide footbox
 
+'participant "Kerberos\nKDC" as KDC
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 'participant "Node\nManager\n(nm)" as NM
@@ -21,7 +22,7 @@ participant "History\nServer\n(hs)" as HS
   activate C
 
 '1
-C->RM: submitApplication\n [RPC:SASL(c-kp,rm-kp)]\n ( job-dir, serialized-secrets )\n : app-rpt{client-tkn}
+C->RM: submitApplication\n [RSKT(c-rm-kst)]\n ( job-dir, c-tokens )\n : app-rpt{cs-tkn}
 
 '2
 C->RM: queryStatus\n [???????]\n ( job-id ) \n: job-status
@@ -32,14 +33,14 @@ C->RM: queryStatus\n [????????]\n ( job-id ) \n: job-status
   note right: Once job is started RM directs C to CS.
 
 '4
-C->CS: queryStatus\n [RPC:SASL(cs-tkn)]\n ( job-id ) \n: job-status
+C->CS: queryStatus\n [RSAT(cs-tkn)]\n ( job-id ) \n: job-status
   note right: While job is running CS provides status.
 
-note over C,HS #green: QUESTION: How does C know to switch to HS?
-note over C,HS #green: QUESTION: Does this use c-hs-dt?
+note over C,HS #green: Q1: How does C know to switch to HS?
+note over C,HS #green: Q2: Does this use c-hs-dt?
 
 '5
-C->HS: queryStatus\n [RPC:SASL(c-hs-dt)]\n ( job-id )\n : job-status
+C->HS: queryStatus\n [RSDT(c-hs-dt)]\n ( job-id )\n : job-status
   note right: After job completes HS provides status to C.
 
   deactivate C

@@ -1,7 +1,7 @@
 @startuml
 title Secure Map Reduce 2 - Map Reduce Job Initiation
 autonumber
-hide footbox
+'hide footbox
 
 'participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
@@ -15,66 +15,77 @@ participant "Client\nService\n(cs)" as CS
 participant "File\nSystem\n(fs)" as FS
 participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
+participant "Kerberos\nKDC" as KDC
 
   'note over RM,DN #green: QUESTION ?
 
-  activate RM
+note over RM,KDC #green: Q1: Where are the submitApplication inputs (job-dir, c-tokens) stored?
 
+ activate RM
 '1
-RM->RM: allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
+RM->RM: <b>allocateResource\n ( mr-rsrc-req )\n : mr-rsrc-res{nm-tkn,ac-tkn}
   note right: RM allocates resources\nwith itself for running MR AM.\nTokens from boostrap.
 
   activate RM
 
 '2
-RM->RM: generateNodeManagerToken\n ( nm-tkn-sk )\n : nm-tkn
+RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : nm-tkn
 
 '3
-RM->RM: generateApplicationContainerToken\n ( ac-tkn-sk )\n : ac-tkn
+RM->RM: createApplicationContainerToken\n ( ac-tkn-sk )\n : ac-tkn
 
 '4
-RM<--RM: mr-cntr-res{nm-tkn,ac-tkn}
-
-'5
-RM->RM: serializeTokens( c-tokens, cs-tkn, ac-tkn ): rm-tokens
+RM<--RM: <b>: mr-rsrc-res{nm-tkn,ac-tkn}
 
   deactivate RM
 
+'5
+RM->RM: <b>serializeTokens\n ( c-tokens, cs-tkn, ac-tkn )\n : rm-tokens
+
 '6
-RM->NM: startContainer\n [RPC:SASL(rm,nm)]\n ( mr-rsrc-res, rm-tokens )
-  note right: tokens: deleg, shuffle, client, app
+RM->KDC: <b>kinit/AS_REQ</b> [KRB] ( rm-kp ): AS_REP{rm-tgt}
+
+'7
+RM->KDC: <b>TGS_REQ</b> [KRB(rm-tgt)] ( nm-kp ): TGS_REP{rm-nm-kst}
+
+'8
+RM->NM: <b>startContainer\n [RSKT(rm-nm-kst)]\n ( mr-rsrs-res, rm-tokens )
+  note right: tokens: deleg, shfl, client, app
 
   deactivate RM
   activate NM
 
-'7
+'9
   create SS
-NM->SS: start?
+NM->SS: <b>start</b>?
 
-'8
-NM->FS: writeTokenFile\n ( rm-tokens )
+'10
+NM->FS: <b>storeTokens\n ( rm-tokens ): rm-tokens-loc
   note left: Write secrets to local token-file.\nIncludes client-token, protected\nby OS permissions
   create AM
 
-  note over RM,DN #green: QUESTION: What user is the AM run as?
+note over RM,KDC #green: Q2: What user is the AM run as?
 
-'9
-NM->AM: exec\n [as rm?]\n ( job-dir, serialized-secrets-loc )
+'11
+NM->AM: <b>exec\n [as rm?]\n ( job-dir, rm-tokens-loc )
   activate AM
   note left: Provided the location\nof the token file via env
 
   deactivate NM
 
-'10
-AM->AM: generateJobToken\n ( job-tkn-sk )\n : job-tkn
+'12
+AM->FS: <b>loadTokens\n ( rm-tokens-loc )\n : rm-tokens
 
-'11
-AM->RM: register\n [RPC:SASL(app-tkn?????]\n ()
+'13
+AM->AM: <b>createJobToken\n ( job-tkn-sk )\n : job-tkn
+
+'14
+AM->RM: <b>register\n [RSAT(app-tkn?????)]\n ()
   note right: Lets NM know MR App is alive.
 
-'12
+'15
   create CS
-AM->CS: start( client-tkn-sk? )
+AM->CS: <b>start</b>\n ( client-tkn-sk? )
   note right: A listener for Client\nto query job status.
 
 'AM uses the app token provided in the token file.

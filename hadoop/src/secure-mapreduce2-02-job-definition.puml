@@ -1,7 +1,7 @@
 @startuml
 title Secure Map Reduce 2 - Map Reduce Job Definition
 autonumber
-hide footbox
+'hide footbox
 
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
@@ -15,52 +15,67 @@ participant "History\nServer\n(hs)" as HS
 'participant "File\nSystem\n(fs)" as FS
 participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
+participant "Kerberos\nKDC" as KDC
 
   'note over C,DN #green: QUESTION: ?
 
   activate C
+
 '1
-C->RM: createJob\n[RPC:SASL(c-kp,rm-kp)]\n()\n: job-id
-  note right: Used to create\nstaging job-dir.
+C->KDC: <b>kinit/AS_REQ</b> [KRB] ( c-kp ): AS_REP{c-tgt}
 
 '2
+C->KDC: <b>TGS_REQ</b> [KRB(c-tgt)] ( rm-kp ): TGS_REP{c-rm-kst}
+
+'3
+C->RM: <b>createJob</b> [RSKT(c-rm-kst)] (): job-id
+  note right: Used to create\nstaging job-dir.
+
   opt if tasks will create new jobs
-C->RM: getResourceManagerDelegationToken\n[RPC:SASL(c-kp,rm-kp)]\n()\n: c-rm-dt
+'4
+C->RM: <b>getResourceManagerDelegationToken\n[RSKT(c-rm-kst)]\n()\n: c-rm-dt
   note right: e.g. Used by\nOozie tasks
   end opt
 
-'3
-C->HS: getHistoryServerDelegationToken\n[RPC:SASL(c-kp,hs-kp)]\n()\n: c-hs-dt
-  note right: To access HS for\ncompleted job status
-
-'4
-C->NN: getNameNodeDelegationToken\n[RPC:SASL(c-kp,nn-kp)]\n()\n: c-nn-dt
-  note right: For tasks to\naccess HDFS data.
-
-  note over C,DN #green: QUESTION: Is this a secret key or a token?
 '5
-C->C: createShuffleTokenSecretKey()\n: shuffle-tkn-sk
-  note right: Used by reduce tasks\nto fetch shuffle data\nfrom NM/ShuffleService.
+C->KDC: <b>TGS_REQ</b> [KRB(c-tgt)] ( hs-kp ): TGS_REP{c-hs-kst}
 
 '6
-C->C: generateShuffleToken\n ( shuffle-tkn-sk ) \n: shuffle-sk
-
-note over C,DN #green: QUESTION: What tokens/secrets are included exactly?
+C->HS: <b>getHistoryServerDelegationToken</b> [RSKT(c-hs-kst)] (): c-hs-dt
+  note right: To access HS for\ncompleted job status
 
 '7
-C->C: serializeTokens\n( c-nn-dt, c-hs-dt, c-rm-dt, shuffle-tkn )\n: c-tokens
-  note right: Serialize all tokens and secret\nkeys to a byte array.\nPassed to RM during submit.
+C->KDC: <b>TGS_REQ</b> [KRB(c-tgt)] ( nn-kp ): TGS_REP{c-nn-kst}
 
 '8
-C->NN: mkdir\n [RPC:SASL(c-kp,nn-kp)]\n ( job-dir )
+C->NN: <b>getNameNodeDelegationToken</b> [RSKT(c-nn-kst)] (): c-nn-dt
+  note right: For tasks to\naccess HDFS data.
+
+note over C,DN #green: Q1: Is this just a secret key or are token created and signed with this?
+
+'9
+C->C: <b>createShuffleTokenSecretKey()\n : shfl-tkn-sk
+
+'10
+C->C: <b>createShuffleToken\n ( shfl-tkn-sk ) \n: shfl-tkn
+  note right: Used by reduce tasks\nto fetch shuffle data\nfrom NM/ShuffleService.
+
+note over C,DN #green: Q2: What tokens/secrets are included exactly?
+
+'11
+C->C: <b>serializeTokens\n( c-nn-dt, c-hs-dt, c-rm-dt, shfl-tkn )\n: c-tokens
+  note right: Serialize all tokens and secret\nkeys to a byte array.\nPassed to RM during appSubmit.
+
+'12
+C->NN: <b>mkdir</b> [RSKT(c-nn-kst)] ( job-dir )
   note right: Create job staging\ndir in HDFS.
 
   loop job-conf, splits, etc.
-'9
-C->NN: writeFile\n [RPC:SASL(c-kp,nn-kp)]\n ()\n : blk-id, blk-loc, blk-tkn
+'13
+C->NN: <b>writeFile</b> [RSKT(c-nn-kst)] (): blk-id, blk-loc, blk-tkn
 
-'10
-C->DN: writeBlock\n [DTP(blk-tkn)]\n ( blk-id, blk-data )
+'14
+C->DN: <b>writeBlock</b>* [DTP(blk-tkn)] ( blk-id, blk-data )
   end loop
 
 @enduml

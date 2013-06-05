@@ -1,8 +1,9 @@
 @startuml
 title Secure Map Reduce 2 - Map Reduce Job Submission
 autonumber
-hide footbox
+'hide footbox
 
+'participant "Kerberos\nKDC" as KDC
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 'participant "History\nServer\n(hs)" as HS
@@ -20,35 +21,38 @@ participant "Resource\nManager\n(rm)" as RM
 
   activate C
 
-  note over C,RM #green: QUESTION: How does RM know this is a MR app and which AM impl to use?
+note over C,RM #green: Q1: How does RM know this is a MR app and which AM impl to use?
 
 '1
-C->RM: submitApplication\n [RPC:SASL(c-kp,rm-kp)]\n ( job-dir, c-tokens )\n : app-rpt{client-tkn}
-  note right: Serialize client's c-tokens include:\nc-nn-dt, c-hs-dt, c-rm-dt, shuffle-tkn
+C->RM: <b>submitApplication\n [RSKT(c-rm-kst)]\n ( job-dir, c-tokens )\n : app-rpt{client-tkn}
+  note right: Client's serialize c-tokens include:\nc-nn-dt, c-hs-dt, [c-rm-dt,] shfl-tkn
 
   activate RM
 
-  note over C,RM #green: QUESTION: When was the client-tkn-sk created?
+note over C,RM #green: Q2: When was the client-tkn-sk created?
+note over C,RM #green: Q3: Is this really just a secret or is it used to sign/verify tokens?
+note over C,RM #green: Q4: Should this be createClientServiceTokenSecretKey(): cs-tkn-sk?
 
 '2
-RM->RM: createClientTokenSecretKey()\n : client-tkn-sk
+RM->RM: <b>createClientTokenSecretKey()\n : client-tkn-sk
   note left: To validate client-tkn
 
 '3
-RM->RM: generateClientToken\n ( client-tkn-sk )\n : client-tkn
+RM->RM: <b>createClientToken\n ( client-tkn-sk )\n : client-tkn
   note left: For the C to talk to AM.
 
-  note over C,RM #green: QUESTION: When was the am-tkn-sk created?
-
-RM->RM: createApplicaitonMasterTokenSecretKey()\n : am-tkn-sk
-  note left: To validate am-tkn
+note over C,RM #green: Q5: When was the am-tkn-sk created?
 
 '4
-RM->RM: generateApplicationMasterToken\n ( am-tkn-sk )\n : am-tkn
-  note left: For AM to talk to the RM.
+RM->RM: <b>createApplicationMasterTokenSecretKey()\n : am-tkn-sk
+  note left: To validate am-tkn
 
 '5
-C<--RM: app-rpt{client-tkn{am-id}}
+RM->RM: <b>createApplicationMasterToken\n ( am-tkn-sk )\n : am-tkn
+  note left: For AM to talk to the RM.
+
+'6
+C<--RM: <b>app-rpt{client-tkn{am-id}}
   note right: ApplicationReport contains\nclient-tkn which contain\nam-id
 
   deactivate RM
