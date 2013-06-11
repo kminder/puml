@@ -7,7 +7,7 @@ autonumber
 participant "Resource\nManager\n(rm)" as RM
 'participant "History\nServer\n(hs)" as HS
 participant "Node\nManager\n(nm)" as NM
-'participant "Shuffle\nService\n(ss)" as SS
+'participant "Shuffle\nHandler\n(ss)" as SS
 participant "Application\nMaster\n(am)" as AM
 'participant "Client\nService\n(cs)" as CS
 'participant "Application\nContainer\n(ac)" as AC #red
@@ -22,12 +22,12 @@ participant "Application\nMaster\n(am)" as AM
 == Bootstrap ==
 
 '1
-RM->RM:<b>createNodeManagerTokenSecretKey()\n : nm-tkn-sk
-  note right: Secret shared with NodeManagers\nto verify NodeManager Tokens.
+RM->RM:<b>createNodeManagerTokenMasterKey</b>(): nm-tkn-mk
+  note right: Secret shared with NodeManagers to verify NodeManager Tokens.
 
 '2
-NM->RM:<b>register/heartbeat</b>( ... )\n : nm-tkn-sk, ...
-  note right: Share nm-tkn-sk with NodeManagers.
+NM->RM:<b>registerNodeManager/nodeHeartbeat</b>[...](...): nm-tkn-mk, ...
+  note right: Share nm-tkn-mk with NodeManagers.
 
 == Job Submission ==
 
@@ -35,66 +35,66 @@ NM->RM:<b>register/heartbeat</b>( ... )\n : nm-tkn-sk, ...
 
 '3
 [->RM: <b>runJob?
-  note right #green: Q1: What is the mechanism by which jobs are discovered on the queue?
+  note right #green: Q1: How are jobs are discovered on the queue?
   activate RM
 
 '4
-RM->RM: <b>allocateResources</b>( ... )
+RM->RM: <b>allocateResources</b>(...)
   note right: Call to self to allocate resources for MapReduce AppMaster.
   activate RM
 
 '5
-RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : am-nm-tkn
-  note right: NodeManager Token to access NodeManager and\nstart AppContainer for MapReduce AppMaster.
+RM->RM: <b>createNodeManagerToken</b>( nm-tkn-mk ): am-nm-tkn
+  note right: NodeManager Token to access NodeManager and start AppContainer for MapReduce AppMaster.
 
 '6
-RM<--RM: <b>:mr-rsrc-res</b>{am-nm-tkn,...}
-  note right: NM Token returned from allocationResources()\nas part of AllocatedContainer.
+RM<--RM: <b>:am-alloc-res</b>{am-nm-tkn,...}
+  note right: NM Token returned from allocationResources() as part of AllocatedContainer.
   deactivate RM
 
 '7
-RM->NM: <b>startContainer\n [RSAT(am-nm-tkn)]\n ( ... )
-  note right: SASL verifies am-nn-tkn with nn-tkn-sk
+RM->NM: <b>startContainer</b> [RSAT(am-nm-tkn)] (...)
+  note right: SASL verifies am-nn-tkn with bm-tkn-mk
   deactivate RM
 
 == Map Task Execution ==
 
 '8
-AM->RM: <b>allocateResources</b>( ... )
-  note right: Allocate AppContainer\nfor MapTask
+AM->RM: <b>allocateResources</b>[...](...)
+  note right: Allocate AppContainer for MapTask.
   activate RM
 
 '9
-RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : mt-nm-tkn
-  note right: NodeManager token to access NodeManager\nand start AppContainer for MapTask.
+RM->RM: <b>createNodeManagerToken</b>( nm-tkn-mk ): mt-nm-tkn
+  note right: NodeManager token to access NodeManager and start AppContainer for MapTask.
 
 '10
-AM<--RM: <b>:mt-rsrc-res</b>{mt-nm-tkn,...}
-  note right: NM Token returned\nfrom allocationResources()\nas part of AllocatedContainer.
+AM<--RM: <b>:mt-alloc-res</b>{mt-nm-tkn,...}
+  note right: NM Token returned as part of AllocatedContainer.
   deactivate RM
 
 '11
-AM->NM: <b>startContainer\n [RSAT(mt-nm-tkn)]\n ( ... )
-  note left: SASL verifies mt-nn-tkn with nn-tkn-sk
+AM->NM: <b>startContainer</b> [RSAT(mt-nm-tkn)] (...)
+  note right: SASL verifies mt-nn-tkn with nn-tkn-mk
 
 == Reduce Task Execution ==
 
 '12
-AM->RM: <b>allocateResources</b>( ... )
-  note right: Allocate AppContainer\nfor ReduceTask
+AM->RM: <b>allocateResources</b>[...](...)
+  note right: Allocate AppContainer for ReduceTask.
   activate RM
 
 '13
-RM->RM: <b>createNodeManagerToken\n ( nm-tkn-sk )\n : rt-nm-tkn
-  note right: NodeManager Token to access NodeManager\nand start AppContainer for ReduceTask.
+RM->RM: <b>createNodeManagerToken</b> ( nm-tkn-mk ): rt-nm-tkn
+  note right: NodeManager Token to access NodeManager and start AppContainer for ReduceTask.
 
 '14
-AM<--RM: <b>:mt-rsrc-res</b>{rt-nm-tkn,...}
-  note right: NM Token returned\nfrom allocationResources()\nas part of AllocatedContainer.
+AM<--RM: <b>:mt-alloc-res</b>{rt-nm-tkn,...}
+  note right: NM Token returned as part of AllocatedContainer.
   deactivate RM
 
 '15
-AM->NM: <b>startContainer\n [RSAT(rt-nm-tkn)]\n ( ... )
-  note left: SASL verifies rt-nn-tkn with nn-tkn-sk
+AM->NM: <b>startContainer</b> [RSAT(rt-nm-tkn)] (...)
+  note right: SASL verifies rt-nn-tkn with nn-tkn-mk
 
-@enduml                                                                                      
+@enduml

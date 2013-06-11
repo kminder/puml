@@ -8,7 +8,7 @@ participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 'participant "History\nServer\n(hs)" as HS
 'participant "Node\nManager\n(nm)" as NM
-'participant "Shuffle\nService\n(ss)" as SS
+'participant "Shuffle\nHandler\n(ss)" as SS
 'participant "Application\nMaster\n(am)" as AM
 'participant "Client\nService\n(cs)" as CS
 'participant "Application\nContainer\n(ac)" as AC #red
@@ -17,43 +17,25 @@ participant "Resource\nManager\n(rm)" as RM
 'participant "Name\nNode\n(nn)" as NN
 'participant "Data\nNode\n(dn)" as DN
 
-  'note over C,RM #green: QUESTION: ?
+'note over C,RM #green: QUESTION: ?
 
   activate C
 
 note over C,RM #green: Q1: How does RM know this is a MR app and which AM impl to use?
 
 '1
-C->RM: <b>submitApplication\n [RSKT(c-rm-kst)]\n ( job-dir, c-tokens )\n : app-rpt{client-tkn}
+C->RM: <b>submitApplication\n [RSKT(c-rm-kst)]\n ( job-dir, c-tokens )\n : app-rpt{clnt-tkn}
   note right: Client's serialize c-tokens include:\nc-nn-dt, c-hs-dt, [c-rm-dt,] shfl-tkn
 
   activate RM
 
-note over C,RM #green: Q2: When was the client-tkn-sk created?
-note over C,RM #green: Q3: Is this really just a secret or is it used to sign/verify tokens?
-note over C,RM #green: Q4: Should this be createClientServiceTokenSecretKey(): cs-tkn-sk?
-
-'2
-RM->RM: <b>createClientTokenSecretKey()\n : client-tkn-sk
-  note left: To validate client-tkn
-
 '3
-RM->RM: <b>createClientToken\n ( client-tkn-sk )\n : client-tkn
+RM->RM: <b>createClientToken\n ( clnt-tkn-mk )\n : clnt-tkn
   note left: For the C to talk to AM.
 
-note over C,RM #green: Q5: When was the am-tkn-sk created?
-
-'4
-RM->RM: <b>createApplicationMasterTokenSecretKey()\n : am-tkn-sk
-  note left: To validate am-tkn
-
-'5
-RM->RM: <b>createApplicationMasterToken\n ( am-tkn-sk )\n : am-tkn
-  note left: For AM to talk to the RM.
-
 '6
-C<--RM: <b>app-rpt{client-tkn{am-id}}
-  note right: ApplicationReport contains\nclient-tkn which contain\nam-id
+C<--RM: <b>app-rpt{clnt-tkn}
+  note right: ApplicationReport contains\nclnt-tkn which contain\nam-id
 
   deactivate RM
   deactivate C

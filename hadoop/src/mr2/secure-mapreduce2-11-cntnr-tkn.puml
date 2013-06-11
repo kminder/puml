@@ -1,0 +1,75 @@
+@startuml
+title Secure Map Reduce 2 - Container Token Flow
+autonumber
+'hide footbox
+
+'participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nHandler\n(ss)" as SS
+participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+participant "Task\n(t)" as T #orange
+participant "File\nSystem\n(fs)" as FS
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+'participant "Kerberos\nKDC" as KDC
+
+'note over C,KDC #green: QUESTION ?
+
+note over RM,FS #green: Q1: How does the cntnr-tkn-mk get distributed to the Tasks/Containers?
+note over RM,FS #green: Q2: What is cntnr-tkn used for?  The AM to talk to the TCs?
+
+== Bootstrap ==
+
+'1
+RM->RM:<b>createContainerTokenMasterKey</b>(): cntnr-tkn-mk
+
+== Job Definition ==
+
+== Job Submission ==
+
+== Job Initiation ==
+
+== Task Execution ==
+
+'2
+AM->RM: <b>allocateResources</b> [...] (...)
+  activate AM
+  activate RM
+
+'3
+RM->RM: <b>createContainerToken</b>( cntnr-tkn-mk ): cntnr-tkn
+
+'4
+AM<--RM: <b>:alloc-res</b>{cntnr-tkn,...}
+
+  deactivate RM
+
+'5
+AM->NM: <b>startContainer</b> [...] ( alloc-res{cntnr-tkn}, ... )
+
+  deactivate RM
+  activate NM
+
+'6
+NM->NM: <b>serializeTokens</b> ( cntnr-tkn, ... ): nm-tokens{cntnr-tkn,...}
+
+'7
+NM->FS: <b>storeTokens\n ( nm-tokens{cntnr-tkn,...} ): nm-tokens-loc
+
+  create T
+'8
+NM->>T: <b>exec</b> [...] ( nm-tokens-loc, ... )
+
+  deactivate NM
+  deactivate AM
+
+'9
+T->FS: <b>loadTokens</b>( nm-tokens-loc ): nm-tokens{cntnr-tkn,...}
+
+== Job Completion ==
+
+@enduml

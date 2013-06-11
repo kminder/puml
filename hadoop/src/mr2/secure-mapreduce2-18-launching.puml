@@ -1,0 +1,66 @@
+@startuml
+title Process Execution
+autonumber
+hide footbox
+
+participant "Client" as C
+participant "Resource\nManager" as RM
+'participant "History\nServer" as HS
+participant "Node\nManager" as NM
+'participant "Shuffle\nHandler" as SS
+participant "Container\nLocalizer" as CL
+participant "Application\nMaster" as AM
+'participant "Client\nService" as CS
+participant "Application\nContainer" as AC #red
+participant "Task" as T #orange
+'participant "Name\nNode" as NN
+'participant "Data\nNode" as DN
+'participant "File\nSystem" as FS
+'participant "Kerberos\nKDC" as KDC
+
+'1
+C->RM: <b>submitApplication
+  activate RM
+
+'2
+RM->NM: <b>startContainer
+  activate NM
+  deactivate RM
+
+'3
+  create CL
+NM->CL: <b>exec
+'  note right #green: Q1 -Run as who?
+
+'4
+  create AM
+NM->AM: <b>exec
+'  note right #green: Q2 - Run as who?
+  deactivate NM
+  activate AM
+
+'5
+AM->NM: <b>startContainer
+  activate NM
+  create CL
+
+'6
+NM->CL: <b>exec
+
+'7
+  create AC
+NM->AC: <b>exec
+'  note right #green: Q3 - Run as who?\nQ4 - Is this user code?
+  deactivate NM
+  activate AC
+
+'8
+  create T
+AC->T: <b>exec
+'  note right #green: Q5 - Run as who?\nQ6 - Or is this user code?
+  activate T
+  deactivate T
+  deactivate AC
+  deactivate AM
+
+@enduml

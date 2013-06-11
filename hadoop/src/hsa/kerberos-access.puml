@@ -1,0 +1,66 @@
+@startuml
+autonumber
+hide footbox
+
+participant "User" as U
+participant "Name Node (nn)" as NN
+participant "Kerberos KDC" as KDC
+
+'1
+U->U: <b>hadoop fs -ls <dir></b>
+  activate U
+
+'2
+U->U: <b>SASL/Kerberos Mutual Auth</b>
+  activate U
+
+'3
+U->U: <b>loadFromTicketCache</b>\n ( kdc-principal )\n : user-kdc-ticket
+
+'4
+U->KDC:<b>TGS-REQ</b>\n ( user-kdc-ticket )\n : <b>TGS-REP</b>{ user-nn-ticket }
+
+'5
+U->U: <b>loadCredentialsFromKeyTab</b>\n ( user-principal )\n : user-password
+
+'6
+U->U: <b>decrypt</b>\n ( user-nn-ticket, user-password )\n : session-key
+
+'7
+U->U: <b>saveTicketInCache</b>\n ( nn-principal, user-nn-ticket )
+
+'8
+U->U: <b>encrypt</b>\n ( user-auth, session-key )\n : enc-user-auth
+
+'9
+U->NN: <b>AP-REQ</b>\n ( user-nn-ticket, enc-user-auth )
+  activate NN
+
+'10
+NN->NN: <b>loadCredentialsFromKeyTab</b>\n ( nn-principal )\n : nn-password
+
+'11
+NN->NN: <b>decrypt</b>\n ( user-nn-ticket, nn-password )\n : session-key
+
+'12
+NN->NN: <b>decrypt</b>\n ( enc-user-auth, session-key )\n : dec-user-auth
+
+'13
+NN->NN: <b>encrypt</b>\n ( dec-user-auth, session-key )\n : enc-nn-auth
+
+'14
+U<--NN: : <b>AP-REP</b>{ enc-nn-auth }
+  deactivate NN
+
+'15
+U->U: <b>decrypt</b>\n ( enc-nn-auth, session-key )\n : dec-nn-auth
+
+'16
+U<--U: : <b>mutually-authenticated</b> =\n user-auth == dec-nn-auth</b>
+  deactivate U
+
+'17
+U->NN: [ mutually-authenticated ]\n<b>listFiles</b>( dir )\n : dir-list
+  deactivate U
+
+@enduml

@@ -1,0 +1,56 @@
+@startuml
+title Secure Map Reduce 2 - YARN Bootstrap
+autonumber
+'hide footbox
+
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+'participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nHandler\n(ss)" as SS
+'participant "History\nServer\n(hs)" as HS
+'participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+participant "Kerberos\nKDC" as KDC
+
+'note over RM,DN #green: QUESTION: ?
+
+'1
+RM->RM: <b>createClientTokenMasterKey()\n : clnt-tkn-mk
+  note right: Used by AM/CS to validate clnt-tkn from clients.
+  activate RM
+
+'2
+RM->RM:<b>createNodeManagerTokenMasterKey()\n : nm-tkn-mk
+  note right: Used by NM to validate nm-tkn from AM.
+
+'3
+RM->RM: <b>createApplicationTokenMasterKey()\n : app-tkn-mk
+  note right: Used by RM to validate app-tkn from AM.
+
+'4
+RM->RM:<b>createContainerTokenMasterKey()\n : cntnr-tkn-mk
+  note right: Used by TC to validate cntnr-tkn from AM.
+  deactivate RM
+
+...
+
+'5
+NM->KDC:<b>kinit/AS_REQ\n [KRB]\n ( nm-kp )\n : AS_REP{nm-tgt}
+  note left: Password used to decrypt nm-tgt from NM's keytab.
+  activate NM
+
+'6
+NM->KDC:<b>TGS_REQ\n [KRB(nm-tgt)]\n ( rm-kp )\n : TGS_REP{nm-rm-kst}
+  note left: Service ticket nm-rm-kst stored in NM's ticket cache.
+
+'7
+NM->RM:<b>registerNodeManager/nodeHeartbeat\n [RSKT(nm-rm-kst)]\n ( nm-status )\n : nm-tkn-mk
+  note right: Distribute nm-tkn-mk to all NMs
+  deactivate NM
+
+@enduml

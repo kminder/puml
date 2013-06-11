@@ -1,0 +1,74 @@
+@startuml
+title Secure Map Reduce 2 - Client Service Token Flow
+autonumber
+'hide footbox
+
+participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nHandler\n(ss)" as SS
+participant "Application\nMaster\n(am)" as AM
+participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+'participant "Kerberos\nKDC" as KDC
+
+'note over C,DN #green: QUESTION ?
+
+'== Bootstrap ==
+
+== Job Definition ==
+
+'1
+C->RM: <b>getNewApplication</b>\n[...] (): app-id
+
+== Job Submission ==
+
+'2
+C->RM: <b>submitApplication</b>\n[...] ( app-id, ... )
+
+  activate RM
+
+'3
+RM->RM: <b>generateSecret</b>\n(): clnt-tkn-mk
+
+'4
+RM->RM: <b>registerApplication</b>\n( app-id, clnt-tkn-mk )
+
+'4
+RM->RM: <b>createClientToken</b>\n( clnt-tkn-mk ): clnt-tkn
+
+'5
+C<--RM:
+  deactivate RM
+
+'6
+C->RM: <b>getApplicationReport</b>\n[...] ( app-id ): app-rpt{ clnt-tkn, ... }
+
+== Job Initiation ==
+
+RM->NM: <b>startContainer</b>\n[...] ( env{ cln-tkn-mk, ... } )
+'  activate NM
+
+  create AM
+
+NM->AM: <b>exec</b>\n( env{ cln-tkn-mk, ... } )
+'  deactivate NM
+
+  create CS
+
+'5
+AM->CS: <b>start</b>\n( clnt-tkn-mk )
+
+== Task Execution ==
+
+'6
+C->CS: <b>getJobReport</b>\n[RSAT:clnt-tkn] ( app-id ): job-rpt
+
+== Job Completion ==
+
+@enduml

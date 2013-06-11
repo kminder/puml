@@ -10,14 +10,14 @@ participant "Application\nMaster\n(am)" as AM
 participant "Resource\nManager\n(rm)" as RM
 participant "History\nServer\n(hs)" as HS
 participant "Node\nManager\n(nm)" as NM
-participant "Shuffle\nService\n(ss)" as SS
+participant "Shuffle\nHandler\n(ss)" as SS
 participant "Application\nContainer\n(ac)" as AC #red
 participant "Task\n(t)" as T #orange
 participant "File\nSystem\n(fs)" as FS
 participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
 
-  'note over C,DN #green: QUESTION ?
+'note over C,DN #green: QUESTION ?
 
 note over C,DN #green: Q1 Are map and reduce tasks run in different ACs?
 
@@ -49,11 +49,11 @@ AC->T: <b>exec\n [as c]\n ()
 
   activate T
 
-note over C,DN #green: Q3: Does this use the shfl-tkn or shfl-sk?
+note over C,DN #green: Q3: Does this use the shfl-tkn or shfl-mk?
 
 '6
 T->NM: <b>readShuffleData\n[HTTP:???(shfl-tkn)?]\n( ? )\n: shfl-data
-'MR ShuffleService service running in the node manager.  Has the shuffle service has the shuffle secret.
+'MR ShuffleHanlder service running in the NodeManager.  Has the shuffle handler service has the shuffle secret.
 'Task talked to NM/ShuffleServcie to get shfl-data.
 'How does the shuffle service get the shfl-tkn.
 

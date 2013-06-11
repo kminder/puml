@@ -21,14 +21,16 @@
     </target>
 
     <target name="clean">
-        <delete dir="png"/>
+        <delete dir="${basedir}/out"/>
     </target>
 
     <target name="render-hadoop" depends="init">
         <java jar="lib/plantuml.jar" fork="true" failonerror="true" dir="hadoop">
             <arg value="-o"/>
-            <arg value="../out"/>
+            <arg value="${basedir}/out"/>
             <arg value="src/*.puml"/>
+            <arg value="src/hsso/*.puml"/>
+            <arg value="src/mr2/*.puml"/>
         </java>
     </target>
 

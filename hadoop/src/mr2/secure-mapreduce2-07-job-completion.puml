@@ -8,7 +8,7 @@ participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 participant "History\nServer\n(hs)" as HS
 participant "Node\nManager\n(nm)" as NM
-participant "Shuffle\nService\n(ss)" as SS
+participant "Shuffle\nHandler\n(ss)" as SS
 participant "Application\nMaster\n(am)" as AM
 participant "Client\nService\n(cs)" as CS
 participant "Application\nContainer\n(ac)" as AC #red
@@ -17,7 +17,7 @@ participant "File\nSystem\n(fs)" as FS
 participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
 
-  'note over C,DN #green: QUESTION ?
+'note over C,DN #green: QUESTION ?
 
 AM->HS: status [RSDT(c-hs-dt)] ( job-status )
 

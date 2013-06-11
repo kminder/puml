@@ -1,0 +1,25 @@
+@startuml
+autonumber
+hide footbox
+
+participant "User" as U
+participant "Kerberos\nKDC" as KDC
+
+'1
+U->U:<b>kinit/ActiveDirectoryLogin</b>( user-principal, user-password )
+  activate U
+
+'2
+U->KDC:<b>AS-REQ</b>( user-principal ): <b>AS-REP</b>{ user-kdc-ticket }
+
+'3
+U->U: <b>decrypt</b>( user-kdc-ticket, user-password ): user-authenticated
+
+'4
+U->U: [ user-authenticated ] <b>saveInTicketCache</b>( user-kdc-ticket )
+
+'5
+U<--U: : <b>user-authenticated</b>
+  deactivate U
+
+@enduml

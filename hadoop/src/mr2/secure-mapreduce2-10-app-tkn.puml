@@ -1,0 +1,67 @@
+@startuml
+title Secure Map Reduce 2 - Application Token Flow
+autonumber
+'hide footbox
+
+'participant "Client\n(c)" as C
+participant "Resource\nManager\n(rm)" as RM
+'participant "History\nServer\n(hs)" as HS
+participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nHandler\n(ss)" as SS
+participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+participant "File\nSystem\n(fs)" as FS
+'participant "Name\nNode\n(nn)" as NN
+'participant "Data\nNode\n(dn)" as DN
+'participant "Kerberos\nKDC" as KDC
+
+'note over C,DN #green: QUESTION ?
+
+== Bootstrap ==
+
+== Job Definition ==
+
+== Job Submission ==
+
+'1
+RM->RM: <b>createApplicationTokenMasterKey</b>(): app-tkn-mk
+
+== Job Initiation ==
+
+'2
+RM->RM: <b>createApplicationToken</b>( app-tkn-mk ): app-tkn
+
+'3
+RM->RM: <b>serializeTokens</b>( app-tkn, ... ): rm-tokens{app-tkn}
+
+'4
+RM->NM: <b>startContainer</b> [...] ( rm-tokens{app-tkn}, ... )
+
+'5
+NM->FS: <b>storeTokens</b>( rm-tokens{app-tkn} ): rm-tokens-loc
+  create AM
+
+'6
+NM->AM: <b>exec</b> [...] ( rm-tokens-loc, ... )
+
+'7
+AM->FS: <b>loadTokens</b> ( rm-tokens-loc ): rm-tokens{app-tkn}
+
+'8
+AM->RM: <b>registerApplicationMaster</b> [RSAT(app-tkn)] (...)
+
+== Map Task Execution ==
+
+'9
+AM->RM: <b>allocateResources</b> [RSAT(app-tkn)] (...): ...
+
+== Reduce Task Execution ==
+
+'10
+AM->RM: <b>allocateResources</b> [RSAT(app-tkn)] (...): ...
+
+== Job Completion ==
+
+@enduml

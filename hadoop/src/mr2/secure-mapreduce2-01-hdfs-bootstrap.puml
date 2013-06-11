@@ -1,0 +1,42 @@
+@startuml
+title Secure Map Reduce 2 - HDFS Bootstrap
+autonumber
+'hide footbox
+
+participant "Name\nNode\n(nn)" as NN
+participant "Data\nNode\n(dn)" as DN
+'participant "Client\n(c)" as C
+'participant "Resource\nManager\n(rm)" as RM
+'participant "Node\nManager\n(nm)" as NM
+'participant "Shuffle\nHandler\n(ss)" as SS
+'participant "History\nServer\n(hs)" as HS
+'participant "Application\nMaster\n(am)" as AM
+'participant "Client\nService\n(cs)" as CS
+'participant "Application\nContainer\n(ac)" as AC #red
+'participant "Task\n(t)" as T #orange
+'participant "File\nSystem\n(fs)" as FS
+participant "Kerberos\nKDC" as KDC
+
+'note over RM,DN #green: QUESTION: ?
+
+'1
+NN->NN: <b>createBlockAccessTokenMasterKey()\n : blk-tkn-mk
+  note right: For DataNodes to validate BlockTokens\nfrom clients and services.
+
+...
+
+'2
+DN->KDC:<b>kinit/AS_REQ\n [KRB]\n ( dn-kp )\n : AS_REP{dn-tgt}
+  note left: DN's dn-tgt decrypted with\npassword in DN keytab.
+  activate DN
+
+'3
+DN->KDC:<b>TGS_REQ\n [KRB(dn-tgt)]\n ( nn-kp )\n : TGS_REP{dn-nn-kst}
+  note left: Service Ticket dn-nn-kst\nstored in DNs ticket cache.
+
+'4
+DN->NN: <b>registerDatanode/sendHeartbeat\n [RSKT(dn-nn-kst)]\n ( dn-status )\n : blk-tkn-mk
+  note right: Distribute blk-tkn-mk to all DNs
+  deactivate DN
+
+@enduml

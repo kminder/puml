@@ -6,7 +6,7 @@ autonumber
 participant "Client\n(c)" as C
 participant "Resource\nManager\n(rm)" as RM
 participant "Node\nManager\n(nm)" as NM
-'participant "Shuffle\nService\n(ss)" as SS
+'participant "Shuffle\nHandler\n(ss)" as SS
 participant "History\nServer\n(hs)" as HS
 'participant "Application\nMaster\n(am)" as AM
 'participant "Client\nService\n(cs)" as CS
@@ -17,7 +17,7 @@ participant "Name\nNode\n(nn)" as NN
 participant "Data\nNode\n(dn)" as DN
 participant "Kerberos\nKDC" as KDC
 
-  'note over C,DN #green: QUESTION: ?
+'note over C,DN #green: QUESTION: ?
 
   activate C
 
@@ -54,11 +54,11 @@ C->NN: <b>getNameNodeDelegationToken</b> [RSKT(c-nn-kst)] (): c-nn-dt
 note over C,DN #green: Q1: Is this just a secret key or are token created and signed with this?
 
 '9
-C->C: <b>createShuffleTokenSecretKey()\n : shfl-tkn-sk
+C->C: <b>createShuffleTokenSecretKey()\n : shfl-tkn-mk
 
 '10
-C->C: <b>createShuffleToken\n ( shfl-tkn-sk ) \n: shfl-tkn
-  note right: Used by reduce tasks\nto fetch shuffle data\nfrom NM/ShuffleService.
+C->C: <b>createShuffleToken\n ( shfl-tkn-mk ) \n: shfl-tkn
+  note right: Used by reduce tasks\nto fetch shuffle data\nfrom NM/ShuffleHandler.
 
 note over C,DN #green: Q2: What tokens/secrets are included exactly?
 

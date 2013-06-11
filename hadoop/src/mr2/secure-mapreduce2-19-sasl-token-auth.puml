@@ -1,0 +1,34 @@
+@startuml
+title SASL/DIGEST-MD5 Token Authentication
+autonumber
+hide footbox
+
+participant "Client" as C
+participant "Server" as S
+
+C->S: <b><i>getToken</i></b>[ kerberos ](...): token{ identifier, password }
+  note right: Kerberos Authentication
+
+...
+
+C->S: <b><i>connect</i></b>[ token ]
+  note right: Token Authentication
+  activate C
+
+C<-S: <b>sasl-digest-challenge</b>( ... )
+
+C->S: <b>sasl-digest-response</b>(\n    token.identifier, ...,\n    dr-md5-hash{ token.password, ..., "AUTHENTICATE" } )
+  note right: Includes "AUTHENTICATE"
+
+S->S: <b><i>verify-md5-hash</i></b>( dr-md5-hash, ... )
+
+C<-S: <b>sasl-response-auth</b>(\n    ...,\n    ra-md5-hash{ token.password, ... } )
+  note right: Excludes "AUTHENTICATE"
+
+C->C: <b><i>verify-md5-hash</i></b>( ra-md5-hash, ... )
+
+C->S: <b><i>accessService</i></b>( ... )
+
+  deactivate C
+
+@enduml
