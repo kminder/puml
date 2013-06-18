@@ -3,64 +3,82 @@ title Process Execution
 autonumber
 hide footbox
 
-participant "Client" as C
-participant "Resource\nManager" as RM
-'participant "History\nServer" as HS
-participant "Node\nManager" as NM
-'participant "Shuffle\nHandler" as SS
-participant "Container\nLocalizer" as CL
-participant "Application\nMaster" as AM
-'participant "Client\nService" as CS
-participant "Application\nContainer" as AC #red
-participant "Task" as T #orange
-'participant "Name\nNode" as NN
-'participant "Data\nNode" as DN
-'participant "File\nSystem" as FS
-'participant "Kerberos\nKDC" as KDC
+participant "Client\n(user)" as C
+participant "Resource\nManager\n(yarn)" as RM
+participant "Node\nManager\n(yarn)" as NM
+participant "Container\nExecutor\n(root)" as CE #red
+participant "Container\nLocalizer\n(user)" as CL
+participant "MR\nApplication\nMaster\nContainer\n(user)" as AM
+participant "MR Task\nContainer\n(user)" as T #orange
 
 '1
 C->RM: <b>submitApplication
+  note right: Client defines and submits a MapReduce Job
   activate RM
 
 '2
 RM->NM: <b>startContainer
+  note right: Starts an allocated container for the MR ApplicationMaster
   activate NM
   deactivate RM
 
 '3
-  create CL
-NM->CL: <b>exec
-'  note right #green: Q1 -Run as who?
+  create CE
+NM->CE: <b>exec</b> [as yarn]
+  note left: Launch native setuid executable to switch user
+  activate CE
 
 '4
-  create AM
-NM->AM: <b>exec
-'  note right #green: Q2 - Run as who?
-  deactivate NM
-  activate AM
+  create CL
+CE->CL: <b>exec</b> [as user]
+  note left: Copies user private files required to run AM to local disk
+  deactivate CE
 
 '5
-AM->NM: <b>startContainer
-  activate NM
-  create CL
+  create CE
+NM->CE: <b>exec</b> [as yarn]
+  note left: Launch native setuid executable to switch user
+  activate CE
 
 '6
-NM->CL: <b>exec
+  create AM
+CE->AM: <b>exec</b> [as user]
+  note left: Executes the MR ApplicationMaster
+  deactivate NM
+  activate AM
+  deactivate CE
 
 '7
-  create AC
-NM->AC: <b>exec
-'  note right #green: Q3 - Run as who?\nQ4 - Is this user code?
-  deactivate NM
-  activate AC
+AM->NM: <b>startContainer
+  note left: Starts an allocated container to run a Task
+  activate NM
 
 '8
+  create CE
+NM->CE: <b>exec</b> [as yarn]
+  note left: Launch native setuid executable to switch user
+  activate CE
+
+'9
+  create CL
+CE->CL: <b>exec</b> [as user]
+  note left: Copies user private files required to run Task to local disk
+  deactivate CE
+
+'10
+  create CE
+NM->CE: <b>exec</b> [as yarn]
+  note left: Launch native setuid executable to switch user
+  activate CE
+
+'11
   create T
-AC->T: <b>exec
-'  note right #green: Q5 - Run as who?\nQ6 - Or is this user code?
-  activate T
+CE->T: <b>exec</b> [as user]
+  note left: Executes map and reduce tasks
+  deactivate CE
+  deactivate NM
   deactivate T
-  deactivate AC
+  deactivate T
   deactivate AM
 
 @enduml

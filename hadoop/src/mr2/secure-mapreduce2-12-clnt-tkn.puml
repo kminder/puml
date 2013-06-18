@@ -24,49 +24,64 @@ participant "Client\nService\n(cs)" as CS
 == Job Definition ==
 
 '1
+'ClientRMService.getNewApplication
 C->RM: <b>getNewApplication</b>\n[...] (): app-id
 
 == Job Submission ==
 
 '2
+'ClientRMService.submitApplication
 C->RM: <b>submitApplication</b>\n[...] ( app-id, ... )
 
   activate RM
 
 '3
+'SecretManager.generateSecret
 RM->RM: <b>generateSecret</b>\n(): clnt-tkn-mk
 
 '4
+'ClientToAMTokenSecretManagerInRM.registerApplication
 RM->RM: <b>registerApplication</b>\n( app-id, clnt-tkn-mk )
 
-'4
-RM->RM: <b>createClientToken</b>\n( clnt-tkn-mk ): clnt-tkn
-
 '5
+RM->RM: <b><i>createClientToken</i></b>\n( clnt-tkn-mk ): clnt-tkn
+
+'6
 C<--RM:
   deactivate RM
 
-'6
+'7
+'ClientRMService.getApplicationReport
 C->RM: <b>getApplicationReport</b>\n[...] ( app-id ): app-rpt{ clnt-tkn, ... }
 
 == Job Initiation ==
 
+'8
+'NMClientImpl.startContainer
+'ContainerManagerImpl.startContainer
 RM->NM: <b>startContainer</b>\n[...] ( env{ cln-tkn-mk, ... } )
-'  activate NM
+  note right: via ContainerLaunchContext
+  activate NM
 
+'9
+'LinuxContainerExecutor.launchContainer
+'ShellCommandExeuctor.execute
+'Shell.runCommand
   create AM
-
 NM->AM: <b>exec</b>\n( env{ cln-tkn-mk, ... } )
-'  deactivate NM
+  deactivate NM
+  activate AM
 
+'10
+'MRClientService.serviceStart
   create CS
-
-'5
-AM->CS: <b>start</b>\n( clnt-tkn-mk )
+AM->CS: <b>serviceStart</b>\n( env{ clnt-tkn-mk, ... } )
+  activate CS
 
 == Task Execution ==
 
-'6
+'11
+'MRClientService.getJobReport
 C->CS: <b>getJobReport</b>\n[RSAT:clnt-tkn] ( app-id ): job-rpt
 
 == Job Completion ==

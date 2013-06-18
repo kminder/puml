@@ -26,42 +26,62 @@ participant "File\nSystem\n(fs)" as FS
 == Job Submission ==
 
 '1
-RM->RM: <b>createApplicationTokenMasterKey</b>(): app-tkn-mk
+'
+'AMRMTokenSecretManager.generateSecret
+RM->RM: <b>generateSecret</b>\n (): app-tkn-mk
 
 == Job Initiation ==
 
 '2
-RM->RM: <b>createApplicationToken</b>( app-tkn-mk ): app-tkn
+RM->RM: <b><i>createToken</i></b>\n ( app-tkn-mk ): app-tkn
 
 '3
-RM->RM: <b>serializeTokens</b>( app-tkn, ... ): rm-tokens{app-tkn}
+'AMLauncher.setupTokensAndEnv
+'credentials.writeTokenStorageToStream(dob);
+'container.setTokens(ByteBuffer.wrap(dob.getData(), 0,
+RM->RM: <b><i>serializeTokens</i></b>\n ( app-tkn, ... )\n : rm-tokens{app-tkn,...}
 
 '4
-RM->NM: <b>startContainer</b> [...] ( rm-tokens{app-tkn}, ... )
+'NMClientImpl.startContainer
+'ContainerManagerImpl.startContainer
+RM->NM: <b>startContainer</b>\n [...] ( rm-tokens{app-tkn}, ... )
+  note right: StartContainerRequest.ContainerLaunchContext.tokens
 
 '5
-NM->FS: <b>storeTokens</b>( rm-tokens{app-tkn} ): rm-tokens-loc
+'ContainerLaunch.call
+'Credentials.writeTokenStorageToStream
+NM->FS: <b><i>storeTokens</i></b>\n ( rm-tokens{app-tkn} ): rm-tokens-loc
   create AM
 
 '6
-NM->AM: <b>exec</b> [...] ( rm-tokens-loc, ... )
+NM->AM: <b>exec</b> [...]\n ( env{rm-tokens-loc,...}, ... )
+  note left: ApplicationConstants.\nCONTAINER_TOKEN_FILE_ENV_NAME
 
 '7
-AM->FS: <b>loadTokens</b> ( rm-tokens-loc ): rm-tokens{app-tkn}
+'ContainerLocalizer.runLocalization
+'Credentials.readTokenStorageStream
+AM->FS: <b><i>loadTokens</i></b>\n ( rm-tokens-loc )\n : rm-tokens{app-tkn,...}
 
 '8
-AM->RM: <b>registerApplicationMaster</b> [RSAT(app-tkn)] (...)
+''ApplicationMasterService.registerApplicationMaster
+AM->RM: <b>registerApplicationMaster</b>\n [RSAT(app-tkn)] (...)
 
 == Map Task Execution ==
 
 '9
-AM->RM: <b>allocateResources</b> [RSAT(app-tkn)] (...): ...
+'ApplicationMasterService.allocate
+AM->RM: <b>allocate</b>\n [RSAT(app-tkn)] (...): ...
 
 == Reduce Task Execution ==
 
 '10
-AM->RM: <b>allocateResources</b> [RSAT(app-tkn)] (...): ...
+'ApplicationMasterService.allocate
+AM->RM: <b>allocate</b>\n [RSAT(app-tkn)] (...): ...
 
 == Job Completion ==
+
+'8
+''ApplicationMasterService.finishApplicationMaster
+AM->RM: <b>finishApplicationMaster</b>\n [RSAT(app-tkn)] (...)
 
 @enduml

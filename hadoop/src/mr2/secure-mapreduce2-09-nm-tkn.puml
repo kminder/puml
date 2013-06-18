@@ -22,79 +22,96 @@ participant "Application\nMaster\n(am)" as AM
 == Bootstrap ==
 
 '1
-RM->RM:<b>createNodeManagerTokenMasterKey</b>(): nm-tkn-mk
-  note right: Secret shared with NodeManagers to verify NodeManager Tokens.
+'BaseNMTokenSecretManager.createNewMasterKey
+RM->RM:<b>createNewMasterKey</b>(): nm-tkn-mk
+  note right: Create secret to shared with NodeManagers.
 
 '2
+'ResourceTrackerService.registerNodeManager/nodeHeartbeat
 NM->RM:<b>registerNodeManager/nodeHeartbeat</b>[...](...): nm-tkn-mk, ...
-  note right: Share nm-tkn-mk with NodeManagers.
+  note right: Share secret nm-tkn-mk with NodeManagers.
 
 == Job Submission ==
 
 == Job Initiation ==
 
 '3
-[->RM: <b>runJob?
+[->RM: ?
   note right #green: Q1: How are jobs are discovered on the queue?
   activate RM
 
 '4
-RM->RM: <b>allocateResources</b>(...)
-  note right: Call to self to allocate resources for MapReduce AppMaster.
+'ApplicationMasterService.allocate
+RM->RM: <b>allocate</b>[...](...)
+  note right: Allocate Container for MapReduce AppMaster.
   activate RM
 
 '5
-RM->RM: <b>createNodeManagerToken</b>( nm-tkn-mk ): am-nm-tkn
-  note right: NodeManager Token to access NodeManager and start AppContainer for MapReduce AppMaster.
+'NMTokenSecretManagerInRM.getNMTokens
+'NMTokenSecretManagerInRM.createNMToken
+RM->RM: <b>createNMToken</b>( nm-tkn-mk, ... ): am-nm-tkn
+  note right: Create NMToken for ResourceManager to start MapReduce AppMaster Container.
 
 '6
-RM<--RM: <b>:am-alloc-res</b>{am-nm-tkn,...}
-  note right: NM Token returned from allocationResources() as part of AllocatedContainer.
+RM<--RM: :<b>AllocateResponse</b>{am-nm-tkn,...}
+  note right: Return NM Token returned from allocate() as part of AllocateResponse.
   deactivate RM
 
 '7
+'NMClientImpl.startContainer
+'ContainerManagerImpl.startContainer
 RM->NM: <b>startContainer</b> [RSAT(am-nm-tkn)] (...)
-  note right: SASL verifies am-nn-tkn with bm-tkn-mk
+  note right: Verifies am-nn-tkn with nn-tkn-mk via RPC/SASL.
   deactivate RM
 
 == Map Task Execution ==
 
 '8
-AM->RM: <b>allocateResources</b>[...](...)
-  note right: Allocate AppContainer for MapTask.
+'ApplicationMasterService.allocate
+AM->RM: <b>allocate</b>[...](...)
+  note right: Allocate Container for Map Task.
   activate RM
 
 '9
-RM->RM: <b>createNodeManagerToken</b>( nm-tkn-mk ): mt-nm-tkn
-  note right: NodeManager token to access NodeManager and start AppContainer for MapTask.
+'NMTokenSecretManagerInRM.getNMTokens
+'NMTokenSecretManagerInRM.createNMToken
+RM->RM: <b>createNMToken</b>( nm-tkn-mk, ... ): mt-nm-tkn
+  note right: Create NMToken for ApplicationMaster to start Map Task Container.
 
 '10
-AM<--RM: <b>:mt-alloc-res</b>{mt-nm-tkn,...}
-  note right: NM Token returned as part of AllocatedContainer.
+AM<--RM: :<b>AllocateResponse</b>{mt-nm-tkn,...}
+  note right: NMToken returned in AllocateResponse.
   deactivate RM
 
 '11
+'NMClientImpl.startContainer
+'ContainerManagerImpl.startContainer
 AM->NM: <b>startContainer</b> [RSAT(mt-nm-tkn)] (...)
-  note right: SASL verifies mt-nn-tkn with nn-tkn-mk
+  note left: Verifies mt-nn-tkn with nn-tkn-mk via RPC/SASL.
 
 == Reduce Task Execution ==
 
 '12
-AM->RM: <b>allocateResources</b>[...](...)
-  note right: Allocate AppContainer for ReduceTask.
+'ApplicationMasterService.allocate
+AM->RM: <b>allocate</b>[...](...)
+  note right: Allocate Container for Reduce Task.
   activate RM
 
 '13
-RM->RM: <b>createNodeManagerToken</b> ( nm-tkn-mk ): rt-nm-tkn
-  note right: NodeManager Token to access NodeManager and start AppContainer for ReduceTask.
+'NMTokenSecretManagerInRM.getNMTokens
+'NMTokenSecretManagerInRM.createNMToken
+RM->RM: <b>createNMToken</b> ( nm-tkn-mk, ... ): rt-nm-tkn
+  note right: Create NMToken for ApplicationMaster to start Reduce Task Container.
 
 '14
-AM<--RM: <b>:mt-alloc-res</b>{rt-nm-tkn,...}
-  note right: NM Token returned as part of AllocatedContainer.
+AM<--RM: :<b>AllocateResponse</b>{rt-nm-tkn,...}
+  note right: NMToken returned in AllocateResponse.
   deactivate RM
 
 '15
+'NMClientImpl.startContainer
+'ContainerManagerImpl.startContainer
 AM->NM: <b>startContainer</b> [RSAT(rt-nm-tkn)] (...)
-  note right: SASL verifies rt-nn-tkn with nn-tkn-mk
+  note left: Verifies rt-nn-tkn with nn-tkn-mk via RPC/SASL.
 
 @enduml
